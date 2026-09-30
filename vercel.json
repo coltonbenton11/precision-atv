@@ -5,26 +5,148 @@
     {
       "source": "/(.*)",
       "headers": [
-        {"key":"X-Content-Type-Options","value":"nosniff"},
-        {"key":"Referrer-Policy","value":"strict-origin-when-cross-origin"},
-        {"key":"Permissions-Policy","value":"camera=(), microphone=(), geolocation=()"}
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        },
+        {
+          "key": "Permissions-Policy",
+          "value": "camera=(), microphone=(), geolocation=()"
+        }
       ]
     },
     {
       "source": "/admin(.*)",
       "headers": [
-        {"key":"X-Robots-Tag","value":"noindex, nofollow"},
-        {"key":"Cache-Control","value":"no-store"}
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        },
+        {
+          "key": "Cache-Control",
+          "value": "no-store"
+        }
       ]
     }
   ],
   "redirects": [
-    {"source":"/analytics","destination":"/admin","permanent":false},
-    {"source":"/analytics.html","destination":"/admin","permanent":false},
-    {"source":"/admin/dashboard","destination":"/admin-dashboard","permanent":false}
+    {
+      "source": "/analytics",
+      "destination": "/admin",
+      "permanent": false
+    },
+    {
+      "source": "/analytics.html",
+      "destination": "/admin",
+      "permanent": false
+    },
+    {
+      "source": "/admin/dashboard",
+      "destination": "/admin-dashboard",
+      "permanent": false
+    },
+    {
+      "source": "/pages/about-us-1",
+      "destination": "/about",
+      "permanent": true
+    },
+    {
+      "source": "/pages/contact",
+      "destination": "/contact",
+      "permanent": true
+    },
+    {
+      "source": "/pages/dyno-tune",
+      "destination": "/services",
+      "permanent": true
+    },
+    {
+      "source": "/collections",
+      "destination": "/shop",
+      "permanent": true
+    },
+    {
+      "source": "/collections/all",
+      "destination": "/shop",
+      "permanent": true
+    },
+    {
+      "source": "/collections/best-selling-products",
+      "destination": "/shop",
+      "permanent": true
+    },
+    {
+      "source": "/collections/newest-products",
+      "destination": "/shop",
+      "permanent": true
+    },
+    {
+      "source": "/blogs/news",
+      "destination": "/shop",
+      "permanent": true
+    },
+    {
+      "source": "/blogs/news/8-budget-friendly-ways-to-boost-atv-utv-and-side-by-side-sxs-performance",
+      "destination": "/services",
+      "permanent": true
+    },
+    {
+      "source": "/blogs/news/8-budget-friendly-ways-to-boost-atv-utility-and-side-by-side-sxs-performance",
+      "destination": "/services",
+      "permanent": true
+    },
+    {
+      "source": "/blogs/news/8-budget-friendly-ways-to-boost-atv-utv-and-side-by-side-sxs-perfo",
+      "destination": "/services",
+      "permanent": true
+    },
+    {
+      "source": "/blogs/news/the-ultimate-atv-utv-and-side-by-side-tire-guide-performance-beyond-the-basics",
+      "destination": "/shop",
+      "permanent": true
+    },
+    {
+      "source": "/cart",
+      "destination": "/shop",
+      "permanent": true
+    },
+    {
+      "source": "/policies/refund-policy",
+      "destination": "https://precisionatv-com.myshopify.com/policies/refund-policy",
+      "permanent": false
+    },
+    {
+      "source": "/policies/privacy-policy",
+      "destination": "https://precisionatv-com.myshopify.com/policies/privacy-policy",
+      "permanent": false
+    },
+    {
+      "source": "/policies/terms-of-service",
+      "destination": "https://precisionatv-com.myshopify.com/policies/terms-of-service",
+      "permanent": false
+    },
+    {
+      "source": "/policies/shipping-policy",
+      "destination": "https://precisionatv-com.myshopify.com/policies/shipping-policy",
+      "permanent": false
+    }
   ],
   "rewrites": [
-    {"source":"/products/:handle","destination":"/api/product-page?handle=:handle"},
-    {"source":"/sitemap.xml","destination":"/api/sitemap"}
+    {
+      "source": "/products/:handle",
+      "destination": "/api/product-page?handle=:handle"
+    },
+    {
+      "source": "/collections/:handle",
+      "destination": "/api/collection-page?handle=:handle"
+    },
+    {
+      "source": "/sitemap.xml",
+      "destination": "/api/sitemap"
+    }
   ]
 }
