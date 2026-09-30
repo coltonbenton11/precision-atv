@@ -1,25 +1,42 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Precision ATV Admin Dashboard</title><meta name="robots" content="noindex,nofollow"><link rel="stylesheet" href="/styles.css"></head><body>
 <nav class="nav"><div class="wrap"><a class="brand" href="/">PRECISION <span>ATV</span></a><div class="navlinks"><a href="/">Storefront</a><a href="/shop">Shop</a><button class="admin-link" onclick="logout()">Log out</button></div></div></nav>
-<header class="page-hero"><div class="wrap"><div class="kicker">Private owner dashboard</div><h1>PERFORMANCE.</h1><p class="muted">Storefront tracking, Google Search Console, and GA4 reporting.</p></div></header>
+<header class="page-hero admin-hero"><div class="wrap"><div class="kicker">Private owner dashboard</div><h1>BUSINESS PERFORMANCE.</h1><p class="muted">Shopify commerce, GA4 traffic, and Google Search Console in one place.</p></div></header>
 <section><div class="wrap">
-<div class="section-head"><div><div class="kicker">Marketing overview</div><h2>Traffic & search.</h2><p id="freshness" class="muted">Loading reporting…</p></div><div id="integrationStatus"></div></div>
-<div class="dash"><div class="metric"><small>Google clicks</small><strong id="clicks">—</strong></div><div class="metric"><small>Impressions</small><strong id="impressions">—</strong></div><div class="metric"><small>CTR</small><strong id="ctr">—</strong></div><div class="metric"><small>Avg position</small><strong id="position">—</strong></div></div>
+<div class="section-head"><div><div class="kicker">Shopify · Last 30 days</div><h2>Commerce.</h2><p id="shopifyStatus" class="muted">Loading Shopify reporting…</p></div><div id="commerceBadge"></div></div>
+<div class="dash"><div class="metric"><small>Total sales</small><strong id="totalSales">—</strong></div><div class="metric"><small>Orders</small><strong id="shopifyOrders">—</strong></div><div class="metric"><small>Average order value</small><strong id="aov">—</strong></div><div class="metric"><small>Returns</small><strong id="returns">—</strong></div></div>
 <div style="height:18px"></div>
+<div class="dash"><div class="metric"><small>Shopify sessions</small><strong id="shopSessions">—</strong></div><div class="metric"><small>Conversion rate</small><strong id="shopConversion">—</strong></div><div class="metric"><small>Reached checkout</small><strong id="reachedCheckout">—</strong></div><div class="metric"><small>Completed checkout</small><strong id="completedCheckout">—</strong></div></div>
+<div style="height:22px"></div><div class="card"><div class="kicker">Top products</div><div class="table-scroll"><table class="table"><thead><tr><th>Product</th><th>Net sales</th><th>Orders</th><th>Items</th></tr></thead><tbody id="products"></tbody></table></div></div>
+</div></section>
+<section class="admin-section-alt"><div class="wrap">
+<div class="section-head"><div><div class="kicker">Google Search Console</div><h2>Organic search.</h2><p id="freshness" class="muted">Loading reporting…</p></div><div id="integrationStatus"></div></div>
+<div class="dash"><div class="metric"><small>Google clicks</small><strong id="clicks">—</strong></div><div class="metric"><small>Impressions</small><strong id="impressions">—</strong></div><div class="metric"><small>CTR</small><strong id="ctr">—</strong></div><div class="metric"><small>Avg position</small><strong id="position">—</strong></div></div>
+<div style="height:22px"></div><div class="split"><div><h3>Top Google searches</h3><div class="table-scroll"><table class="table"><thead><tr><th>Query</th><th>Clicks</th><th>Impr.</th><th>Position</th></tr></thead><tbody id="queries"></tbody></table></div></div><div><h3>Top organic pages</h3><div class="table-scroll"><table class="table"><thead><tr><th>Page</th><th>Clicks</th><th>Impr.</th></tr></thead><tbody id="pages"></tbody></table></div></div></div>
+</div></section>
+<section><div class="wrap">
+<div class="section-head"><div><div class="kicker">Google Analytics 4</div><h2>Visitor behavior.</h2></div><div><span class="status">GA4 TRACKING LIVE</span></div></div>
 <div class="dash"><div class="metric"><small>GA4 users</small><strong id="users">—</strong></div><div class="metric"><small>Sessions</small><strong id="sessions">—</strong></div><div class="metric"><small>Purchases</small><strong id="purchases">—</strong></div><div class="metric"><small>Revenue</small><strong id="revenue">—</strong></div></div>
-<div style="height:22px"></div><div class="split"><div><h3>Top Google searches</h3><table class="table"><thead><tr><th>Query</th><th>Clicks</th><th>Impr.</th><th>Position</th></tr></thead><tbody id="queries"></tbody></table></div><div><h3>Top organic pages</h3><table class="table"><thead><tr><th>Page</th><th>Clicks</th><th>Impr.</th></tr></thead><tbody id="pages"></tbody></table></div></div>
-<div style="height:22px"></div><div class="card"><div class="kicker">Tracking status</div><h3>GA4 measurement: G-ND2GJ5FD6S</h3><p id="note" class="muted"></p></div>
+<div style="height:22px"></div><div class="card"><div class="kicker">Tracking status</div><h3>GA4 measurement: G-ND2GJ5FD6S</h3><p id="note" class="muted"></p><p id="warnings" class="muted"></p></div>
 </div></section>
 <script>
+const cur='USD';function cash(v,c=cur){return v==null?'—':new Intl.NumberFormat('en-US',{style:'currency',currency:c}).format(Number(v||0))}
 function shortPage(u){try{const x=new URL(u);return x.pathname==='/'?'/':x.pathname.slice(0,58)}catch{return u}}
 async function load(){
  const r=await fetch('/api/metrics',{cache:'no-store'});if(r.status===401){location.replace('/admin');return}const d=await r.json();if(!r.ok){document.getElementById('freshness').textContent=d.error||'Unable to load reporting';return}
+ const c=d.commerce;
+ document.getElementById('commerceBadge').innerHTML=d.shopifyReportingLive?'<span class="status">SHOPIFY LIVE</span>':'<span class="status off">SHOPIFY ADMIN API NEEDED</span>';
+ document.getElementById('shopifyStatus').textContent=d.shopifyReportingLive?(c.period+' · '+(d.commerceSource==='shopifyql'?'Shopify analytics':'Shopify order totals')):'Storefront checkout is live; add the Shopify Admin reporting token to populate sales analytics here.';
+ document.getElementById('totalSales').textContent=c?cash(c.totalSales,c.currency):'—';document.getElementById('shopifyOrders').textContent=c?.orders??'—';document.getElementById('aov').textContent=c?cash(c.averageOrderValue,c.currency):'—';document.getElementById('returns').textContent=c?cash(c.returns,c.currency):'—';
+ document.getElementById('shopSessions').textContent=c?.sessions??'—';document.getElementById('shopConversion').textContent=c?.conversionRate!=null?(Number(c.conversionRate)*100).toFixed(2)+'%':'—';document.getElementById('reachedCheckout').textContent=c?.checkoutSessions??'—';document.getElementById('completedCheckout').textContent=c?.completedCheckoutSessions??'—';
+ document.getElementById('products').innerHTML=(c?.topProducts||[]).map(x=>`<tr><td>${x.title}</td><td>${cash(x.netSales,c.currency)}</td><td>${x.orders}</td><td>${x.items}</td></tr>`).join('')||'<tr><td colspan="4">Shopify product analytics will appear here once Admin reporting is connected.</td></tr>';
  document.getElementById('clicks').textContent=d.search?.clicks??'—';document.getElementById('impressions').textContent=d.search?.impressions?.toLocaleString?.()??d.search?.impressions??'—';document.getElementById('ctr').textContent=d.search?.ctr!=null?Number(d.search.ctr).toFixed(2)+'%':'—';document.getElementById('position').textContent=d.search?.position!=null?Number(d.search.position).toFixed(2):'—';
- document.getElementById('users').textContent=d.ga?.users??'—';document.getElementById('sessions').textContent=d.ga?.sessions??'—';document.getElementById('purchases').textContent=d.ga?.purchases??'—';document.getElementById('revenue').textContent=d.ga?.revenue!=null?new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'}).format(d.ga.revenue):'—';
- document.getElementById('integrationStatus').innerHTML='<span class="status">GA4 TRACKING LIVE</span> &nbsp; <span class="status">SEARCH CONSOLE LIVE</span>';
+ document.getElementById('users').textContent=d.ga?.users??'—';document.getElementById('sessions').textContent=d.ga?.sessions??'—';document.getElementById('purchases').textContent=d.ga?.purchases??'—';document.getElementById('revenue').textContent=d.ga?.revenue!=null?cash(d.ga.revenue,'USD'):'—';
+ document.getElementById('integrationStatus').innerHTML='<span class="status">SEARCH CONSOLE CONNECTED</span>';
  document.getElementById('freshness').textContent=d.source==='live'?'Live Google API reporting':`Search Console snapshot through ${d.snapshotUpdatedAt}`;
  document.getElementById('queries').innerHTML=(d.search?.queries||[]).map(x=>`<tr><td>${x.query}</td><td>${x.clicks}</td><td>${x.impressions}</td><td>${Number(x.position).toFixed(1)}</td></tr>`).join('')||'<tr><td colspan="4">No query data yet.</td></tr>';
  document.getElementById('pages').innerHTML=(d.search?.pages||[]).map(x=>`<tr><td title="${x.page}">${shortPage(x.page)}</td><td>${x.clicks}</td><td>${x.impressions}</td></tr>`).join('')||'<tr><td colspan="3">No page data yet.</td></tr>';
- document.getElementById('note').textContent=d.gaReportingLive?'GA4 reporting is live.':'GA4 tracking is live; reporting totals will populate as the new property collects traffic.';
+ document.getElementById('note').textContent=d.gaReportingLive?'GA4 reporting is live.':'GA4 collection is live. Historical totals will build as the new property receives traffic; direct Data API reporting can be enabled with Google server credentials.';
+ document.getElementById('warnings').textContent=(d.warning||[]).join(' • ');
 }
 async function logout(){await fetch('/api/admin-logout',{method:'POST'});location.replace('/admin')}
 load();
