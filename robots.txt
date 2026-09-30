@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 Disallow: /analytics
-Sitemap: https://www.precisionatv.com/sitemap.xml
+Sitemap: https://precisionatvfab.com/sitemap.xml
