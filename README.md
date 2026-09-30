@@ -20,7 +20,10 @@ Copy `.env.example` values into Vercel Project Settings > Environment Variables.
 ### Shopify
 `SHOPIFY_STORE_DOMAIN=precisionatv-com.myshopify.com`
 `SHOPIFY_STOREFRONT_TOKEN=<Storefront API public access token>`
-`SHOPIFY_ADMIN_ACCESS_TOKEN=<Admin API token with read_reports + read_orders>`
+`SHOPIFY_ADMIN_CLIENT_ID=<Dev Dashboard app client ID>`
+`SHOPIFY_ADMIN_CLIENT_SECRET=<Dev Dashboard app client secret>`
+
+Grant the app `read_reports` and `read_orders`. The server exchanges these credentials for a short-lived Admin API access token automatically. Existing legacy/admin-created apps can alternatively set `SHOPIFY_ADMIN_ACCESS_TOKEN`.
 
 ### GA4 client tracking
 `GA4_MEASUREMENT_ID=G-ND2GJ5FD6S`
