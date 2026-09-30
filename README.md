@@ -51,3 +51,4 @@ The public storefront has no analytics link. Owners sign in at `/admin`. Authent
 <!-- dashboard key reset deploy -->
 <!-- single-project deploy after duplicate removal -->
 <!-- post-cooldown deploy retry -->
+<!-- pro-plan production deploy -->
