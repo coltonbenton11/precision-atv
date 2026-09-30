@@ -9,7 +9,11 @@ function shell(title,body,head=''){return `<!doctype html><html lang="en"><head>
 
 export default async function handler(req,res){
   const handle=String(req.query.handle||'').trim();
-  const rawDomain=process.env.SHOPIFY_STORE_DOMAIN||'';const domain=rawDomain.replace(/^https?:\\/\\//,'').replace(/\\/$/,'');const token=process.env.SHOPIFY_STOREFRONT_TOKEN||process.env.SHOPIFY_STOREFRONT_ACCESS_TOKEN||process.env.SHOPIFY_STOREFRONT_PUBLIC_ACCESS_TOKEN;
+  let domain=(process.env.SHOPIFY_STORE_DOMAIN||'').trim();
+  if(domain.startsWith('https://'))domain=domain.slice(8);
+  else if(domain.startsWith('http://'))domain=domain.slice(7);
+  while(domain.endsWith('/'))domain=domain.slice(0,-1);
+  const token=process.env.SHOPIFY_STOREFRONT_TOKEN||process.env.SHOPIFY_STOREFRONT_ACCESS_TOKEN||process.env.SHOPIFY_STOREFRONT_PUBLIC_ACCESS_TOKEN;
   if(!handle)return res.status(400).send('Missing product handle.');
   if(!domain||!token)return res.status(503).send('Shopify is not configured.');
 
@@ -21,7 +25,31 @@ export default async function handler(req,res){
     const p=j.data?.product;
     if(!p){
       res.status(404);
-      return res.send(shell('Product not found | Precision ATV',`<nav class="nav"><div class="wrap"><a class="brand" href="/">PRECISION <span>ATV</span></a><div class="navlinks"><a href="/shop">Shop</a><a href="/services">Engine Builds & Tuning</a><a href="/about">About</a><a href="/contact">Contact</a><a class="admin-nav" href="/admin">Admin</a><a class="btn" href="tel:+19362287655">Call the shop</a></div><div class="mobile-actions"><a class="mobile-admin" href="/admin">Admin</a><a class="mobile-call" href="tel:+19362287655">Call</a></div></div></nav>
+      return res.send(shell('Product not found | Precision ATV',`<nav class="nav"><div class="wrap"><a class="brand" href="/">PRECISION <span>ATV</span></a><div class="navlinks"><a href="/shop">Shop</a><a href="/services">Engine Builds & Tuning</a><a href="/#shop">Our Shop</a></div></div></nav><section><div class="wrap"><div class="card"><h1>Product not found.</h1><p class="muted">This item may have moved or is no longer available.</p><a class="btn" href="/shop">Back to shop</a></div></div></section>`));
+    }
+
+    const variants=p.variants?.nodes||[];
+    const selected=variants.find(v=>v.availableForSale)||variants[0];
+    const images=(p.images?.nodes?.length?p.images.nodes:(p.featuredImage?[p.featuredImage]:[]));
+    const canonical=`${BASE}/products/${encodeURIComponent(p.handle)}`;
+    const metaTitle=p.seo?.title||`${p.title} | Precision ATV`;
+    const metaDescription=p.seo?.description||strip(p.descriptionHtml).slice(0,155)||`Shop ${p.title} from Precision ATV in Conroe, Texas.`;
+    const mainImage=images[0]?.url||'';
+    const currency=selected?.price?.currencyCode||'USD';
+    const schema={
+      '@context':'https://schema.org','@type':'Product',
+      name:p.title,description:strip(p.descriptionHtml),image:images.map(i=>i.url),brand:{'@type':'Brand',name:p.vendor||'Precision ATV'},
+      sku:selected?.id||p.id,
+      offers:variants.map(v=>({'@type':'Offer',url:canonical,priceCurrency:v.price?.currencyCode||'USD',price:v.price?.amount||0,availability:v.availableForSale?'https://schema.org/InStock':'https://schema.org/OutOfStock'}))
+    };
+    const variantOptions=variants.map(v=>`<option value="${esc(v.id)}" data-price="${esc(v.price?.amount||0)}" data-currency="${esc(v.price?.currencyCode||'USD')}" data-available="${v.availableForSale?'1':'0'}" ${v.id===selected?.id?'selected':''}>${esc(v.title==='Default Title'?'Standard':v.title)} — ${esc(money(v.price?.amount,v.price?.currencyCode))}${v.availableForSale?'':' — Sold out'}</option>`).join('');
+    const thumbs=images.map((img,i)=>`<button class="thumb ${i===0?'active':''}" type="button" onclick="swapImage(this,'${esc(img.url)}')"><img src="${esc(img.url)}" alt="${esc(img.altText||p.title)}"></button>`).join('');
+    const compare=selected?.compareAtPrice&&Number(selected.compareAtPrice.amount)>Number(selected.price?.amount)?`<span class="compare-price">${esc(money(selected.compareAtPrice.amount,selected.compareAtPrice.currencyCode))}</span>`:'';
+
+    const head=`<meta name="description" content="${esc(metaDescription)}"><link rel="canonical" href="${esc(canonical)}"><meta property="og:type" content="product"><meta property="og:title" content="${esc(metaTitle)}"><meta property="og:description" content="${esc(metaDescription)}"><meta property="og:url" content="${esc(canonical)}">${mainImage?`<meta property="og:image" content="${esc(mainImage)}">`:''}<script type="application/ld+json">${safeJson(schema)}</script>`;
+    const body=`
+<div class="topbar"><div class="wrap"><div>CONROE, TEXAS • BUILT FOR THE RIDE</div><div>Fitment help: <a href="tel:+19362287655">(936) 228-7655</a></div></div></div>
+<nav class="nav"><div class="wrap"><a class="brand" href="/">PRECISION <span>ATV</span></a><div class="navlinks"><a href="/shop">Shop</a><a href="/services">Engine Builds & Tuning</a><a href="/about">About</a><a href="/contact">Contact</a><a class="admin-nav" href="/admin">Admin</a><a class="btn" href="tel:+19362287655">Call the shop</a></div><div class="mobile-actions"><a class="mobile-admin" href="/admin">Admin</a><a class="mobile-call" href="tel:+19362287655">Call</a></div></div></nav>
 <section class="product-page"><div class="wrap">
 <div class="breadcrumbs"><a href="/">Home</a><span>›</span><a href="/shop">Shop</a><span>›</span><span>${esc(p.productType||'Product')}</span></div>
 <div class="product-detail">
