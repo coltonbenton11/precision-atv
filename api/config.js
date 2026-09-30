@@ -1,1 +1,1 @@
-export default function handler(req,res){res.status(200).json({ga4MeasurementId:process.env.GA4_MEASUREMENT_ID||''})}
+export default function handler(req,res){res.status(200).json({ga4MeasurementId:process.env.GA4_MEASUREMENT_ID||'G-ND2GJ5FD6S'})}
