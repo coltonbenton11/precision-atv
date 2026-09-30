@@ -46,3 +46,4 @@ The files currently use `https://precisionatvfab.com/` as the intended canonical
 
 ## Admin
 The public storefront has no analytics link. Owners sign in at `/admin`. Authentication uses an HttpOnly signed session cookie; the browser never stores the admin password itself. Shopify reporting uses ShopifyQL when `read_reports` is available and falls back to recent-order totals with `read_orders`.
+<!-- Shopify admin credentials deployment refresh -->
