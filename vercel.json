@@ -11,10 +11,15 @@
       ]
     }
   ],
+  "redirects": [
+    {"source":"/analytics","destination":"/admin","permanent":false},
+    {"source":"/analytics.html","destination":"/admin","permanent":false}
+  ],
   "rewrites": [
     {"source":"/shop","destination":"/shop.html"},
     {"source":"/services","destination":"/services.html"},
-    {"source":"/analytics","destination":"/analytics.html"},
+    {"source":"/admin","destination":"/admin.html"},
+    {"source":"/admin/dashboard","destination":"/admin-dashboard.html"},
     {"source":"/products/:handle","destination":"/api/product-page?handle=:handle"},
     {"source":"/sitemap.xml","destination":"/api/sitemap"}
   ]
