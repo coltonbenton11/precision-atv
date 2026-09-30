@@ -22,11 +22,11 @@ Copy `.env.example` values into Vercel Project Settings > Environment Variables.
 `SHOPIFY_STOREFRONT_TOKEN=<Storefront API public access token>`
 
 ### GA4 client tracking
-`GA4_MEASUREMENT_ID=G-XXXXXXXXXX`
+`GA4_MEASUREMENT_ID=G-ND2GJ5FD6S`
 
 ### Owner reporting dashboard
-`GA4_PROPERTY_ID=<numeric GA4 property id>`
-`GSC_SITE_URL=https://precisionatvfab.com/`
+`GA4_PROPERTY_ID=556833689`
+`GSC_SITE_URL=sc-domain:precisionatvfab.com`
 `GOOGLE_SERVICE_ACCOUNT_EMAIL=<service-account-email>`
 `GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY=<private-key>`
 `DASHBOARD_KEY=<long random password>`
