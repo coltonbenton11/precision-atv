@@ -26,7 +26,7 @@ Copy `.env.example` values into Vercel Project Settings > Environment Variables.
 
 ### Owner reporting dashboard
 `GA4_PROPERTY_ID=<numeric GA4 property id>`
-`GSC_SITE_URL=https://www.precisionatv.com/`
+`GSC_SITE_URL=https://precisionatvfab.com/`
 `GOOGLE_SERVICE_ACCOUNT_EMAIL=<service-account-email>`
 `GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY=<private-key>`
 `DASHBOARD_KEY=<long random password>`
@@ -37,4 +37,4 @@ Add the Google service-account email as a viewer on GA4 and as a user/owner on t
 If Shopify credentials are missing, the site uses a 33-product preview catalog based on the existing Precision ATV store. Once credentials are added, `/api/products` automatically switches to live Shopify products, prices, variants, availability and product images. Checkout is created through Shopify's Storefront Cart API.
 
 ## Domain
-The files currently use `https://www.precisionatv.com/` as the intended canonical production domain. Update `canonical`, `robots.txt`, `sitemap.xml`, and `GSC_SITE_URL` if a different final domain is selected.
+The files currently use `https://precisionatvfab.com/` as the intended canonical production domain. Update `canonical`, `robots.txt`, `sitemap.xml`, and `GSC_SITE_URL` if a different final domain is selected.
