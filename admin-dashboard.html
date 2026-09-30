@@ -1,0 +1,26 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Precision ATV Admin Dashboard</title><meta name="robots" content="noindex,nofollow"><link rel="stylesheet" href="/styles.css"></head><body>
+<nav class="nav"><div class="wrap"><a class="brand" href="/">PRECISION <span>ATV</span></a><div class="navlinks"><a href="/">Storefront</a><a href="/shop">Shop</a><button class="admin-link" onclick="logout()">Log out</button></div></div></nav>
+<header class="page-hero"><div class="wrap"><div class="kicker">Private owner dashboard</div><h1>PERFORMANCE.</h1><p class="muted">Storefront tracking, Google Search Console, and GA4 reporting.</p></div></header>
+<section><div class="wrap">
+<div class="section-head"><div><div class="kicker">Marketing overview</div><h2>Traffic & search.</h2><p id="freshness" class="muted">Loading reporting…</p></div><div id="integrationStatus"></div></div>
+<div class="dash"><div class="metric"><small>Google clicks</small><strong id="clicks">—</strong></div><div class="metric"><small>Impressions</small><strong id="impressions">—</strong></div><div class="metric"><small>CTR</small><strong id="ctr">—</strong></div><div class="metric"><small>Avg position</small><strong id="position">—</strong></div></div>
+<div style="height:18px"></div>
+<div class="dash"><div class="metric"><small>GA4 users</small><strong id="users">—</strong></div><div class="metric"><small>Sessions</small><strong id="sessions">—</strong></div><div class="metric"><small>Purchases</small><strong id="purchases">—</strong></div><div class="metric"><small>Revenue</small><strong id="revenue">—</strong></div></div>
+<div style="height:22px"></div><div class="split"><div><h3>Top Google searches</h3><table class="table"><thead><tr><th>Query</th><th>Clicks</th><th>Impr.</th><th>Position</th></tr></thead><tbody id="queries"></tbody></table></div><div><h3>Top organic pages</h3><table class="table"><thead><tr><th>Page</th><th>Clicks</th><th>Impr.</th></tr></thead><tbody id="pages"></tbody></table></div></div>
+<div style="height:22px"></div><div class="card"><div class="kicker">Tracking status</div><h3>GA4 measurement: G-ND2GJ5FD6S</h3><p id="note" class="muted"></p></div>
+</div></section>
+<script>
+function shortPage(u){try{const x=new URL(u);return x.pathname==='/'?'/':x.pathname.slice(0,58)}catch{return u}}
+async function load(){
+ const r=await fetch('/api/metrics',{cache:'no-store'});if(r.status===401){location.replace('/admin');return}const d=await r.json();if(!r.ok){document.getElementById('freshness').textContent=d.error||'Unable to load reporting';return}
+ document.getElementById('clicks').textContent=d.search?.clicks??'—';document.getElementById('impressions').textContent=d.search?.impressions?.toLocaleString?.()??d.search?.impressions??'—';document.getElementById('ctr').textContent=d.search?.ctr!=null?Number(d.search.ctr).toFixed(2)+'%':'—';document.getElementById('position').textContent=d.search?.position!=null?Number(d.search.position).toFixed(2):'—';
+ document.getElementById('users').textContent=d.ga?.users??'—';document.getElementById('sessions').textContent=d.ga?.sessions??'—';document.getElementById('purchases').textContent=d.ga?.purchases??'—';document.getElementById('revenue').textContent=d.ga?.revenue!=null?new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'}).format(d.ga.revenue):'—';
+ document.getElementById('integrationStatus').innerHTML='<span class="status">GA4 TRACKING LIVE</span> &nbsp; <span class="status">SEARCH CONSOLE LIVE</span>';
+ document.getElementById('freshness').textContent=d.source==='live'?'Live Google API reporting':`Search Console snapshot through ${d.snapshotUpdatedAt}`;
+ document.getElementById('queries').innerHTML=(d.search?.queries||[]).map(x=>`<tr><td>${x.query}</td><td>${x.clicks}</td><td>${x.impressions}</td><td>${Number(x.position).toFixed(1)}</td></tr>`).join('')||'<tr><td colspan="4">No query data yet.</td></tr>';
+ document.getElementById('pages').innerHTML=(d.search?.pages||[]).map(x=>`<tr><td title="${x.page}">${shortPage(x.page)}</td><td>${x.clicks}</td><td>${x.impressions}</td></tr>`).join('')||'<tr><td colspan="3">No page data yet.</td></tr>';
+ document.getElementById('note').textContent=d.gaReportingLive?'GA4 reporting is live.':'GA4 tracking is live; reporting totals will populate as the new property collects traffic.';
+}
+async function logout(){await fetch('/api/admin-logout',{method:'POST'});location.replace('/admin')}
+load();
+</script></body></html>
