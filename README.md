@@ -38,3 +38,4 @@ If Shopify credentials are missing, the site uses a 33-product preview catalog b
 
 ## Domain
 The files currently use `https://precisionatvfab.com/` as the intended canonical production domain. Update `canonical`, `robots.txt`, `sitemap.xml`, and `GSC_SITE_URL` if a different final domain is selected.
+<!-- Dashboard deployment refresh -->
