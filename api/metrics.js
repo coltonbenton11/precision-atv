@@ -22,10 +22,21 @@ async function gsc(token){
   const [q,p]=await Promise.all([report(['query']),report(['page'])]);
   return{queries:q.map(x=>({query:x.keys?.[0]||'',clicks:x.clicks||0,impressions:x.impressions||0,ctr:(x.ctr||0)*100,position:x.position||0})),pages:p.map(x=>({page:x.keys?.[0]||'',clicks:x.clicks||0,impressions:x.impressions||0,ctr:(x.ctr||0)*100,position:x.position||0}))};
 }
+let cachedAdminToken=null,cachedAdminTokenUntil=0;
+async function shopifyAdminToken(){
+  if(process.env.SHOPIFY_ADMIN_ACCESS_TOKEN)return process.env.SHOPIFY_ADMIN_ACCESS_TOKEN;
+  const clientId=process.env.SHOPIFY_ADMIN_CLIENT_ID,clientSecret=process.env.SHOPIFY_ADMIN_CLIENT_SECRET;
+  const domain=process.env.SHOPIFY_STORE_DOMAIN||'precisionatv-com.myshopify.com';
+  if(!clientId||!clientSecret)throw new Error('Shopify Admin reporting credentials are not configured');
+  if(cachedAdminToken&&Date.now()<cachedAdminTokenUntil)return cachedAdminToken;
+  const body=new URLSearchParams({grant_type:'client_credentials',client_id:clientId,client_secret:clientSecret});
+  const r=await fetch(`https://${domain}/admin/oauth/access_token`,{method:'POST',headers:{'content-type':'application/x-www-form-urlencoded'},body});
+  const j=await r.json();if(!r.ok||!j.access_token)throw new Error(j.error_description||j.error||'Unable to authenticate Shopify Admin API');
+  cachedAdminToken=j.access_token;cachedAdminTokenUntil=Date.now()+Math.max(60000,(Number(j.expires_in||3600)-300)*1000);return cachedAdminToken;
+}
 async function adminGraphql(query,variables={}){
   const domain=process.env.SHOPIFY_STORE_DOMAIN||'precisionatv-com.myshopify.com';
-  const token=process.env.SHOPIFY_ADMIN_ACCESS_TOKEN;
-  if(!token)throw new Error('Shopify Admin reporting token is not configured');
+  const token=await shopifyAdminToken();
   const r=await fetch(`https://${domain}/admin/api/${SHOPIFY_API}/graphql.json`,{method:'POST',headers:{'content-type':'application/json','X-Shopify-Access-Token':token},body:JSON.stringify({query,variables})});
   const j=await r.json();if(!r.ok||j.errors)throw new Error(j.errors?.[0]?.message||'Shopify Admin API request failed');return j.data;
 }
@@ -90,7 +101,7 @@ export default async function handler(req,res){
   res.setHeader('Cache-Control','no-store');
   if(!isAdmin(req))return res.status(401).json({error:'Admin login required.'});
   const googleCredentialsConfigured=!!(process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL&&process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY);
-  const shopifyConfigured=!!process.env.SHOPIFY_ADMIN_ACCESS_TOKEN;
+  const shopifyConfigured=!!(process.env.SHOPIFY_ADMIN_ACCESS_TOKEN||(process.env.SHOPIFY_ADMIN_CLIENT_ID&&process.env.SHOPIFY_ADMIN_CLIENT_SECRET));
   let gaData=metricsSnapshot.ga,searchData=metricsSnapshot.search,warning=[],source='snapshot',commerce=null,commerceSource=null;
   if(googleCredentialsConfigured){
     try{
