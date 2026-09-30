@@ -1,4 +1,6 @@
 User-agent: *
 Allow: /
+Disallow: /admin
 Disallow: /analytics
+Disallow: /api/
 Sitemap: https://precisionatvfab.com/sitemap.xml
