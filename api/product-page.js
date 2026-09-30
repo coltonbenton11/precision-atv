@@ -21,7 +21,7 @@ export default async function handler(req,res){
     const p=j.data?.product;
     if(!p){
       res.status(404);
-      return res.send(shell('Product not found | Precision ATV',`<nav class="nav"><div class="wrap"><a class="brand" href="/">PRECISION <span>ATV</span></a><div class="navlinks"><a href="/shop">Shop</a><a href="/services">Service & Repair</a><a href="/#shop">Our Shop</a></div></div></nav><section><div class="wrap"><div class="card"><h1>Product not found.</h1><p class="muted">This item may have moved or is no longer available.</p><a class="btn" href="/shop">Back to shop</a></div></div></section>`));
+      return res.send(shell('Product not found | Precision ATV',`<nav class="nav"><div class="wrap"><a class="brand" href="/">PRECISION <span>ATV</span></a><div class="navlinks"><a href="/shop">Shop</a><a href="/services">Engine Builds & Tuning</a><a href="/#shop">Our Shop</a></div></div></nav><section><div class="wrap"><div class="card"><h1>Product not found.</h1><p class="muted">This item may have moved or is no longer available.</p><a class="btn" href="/shop">Back to shop</a></div></div></section>`));
     }
 
     const variants=p.variants?.nodes||[];
@@ -45,7 +45,7 @@ export default async function handler(req,res){
     const head=`<meta name="description" content="${esc(metaDescription)}"><link rel="canonical" href="${esc(canonical)}"><meta property="og:type" content="product"><meta property="og:title" content="${esc(metaTitle)}"><meta property="og:description" content="${esc(metaDescription)}"><meta property="og:url" content="${esc(canonical)}">${mainImage?`<meta property="og:image" content="${esc(mainImage)}">`:''}<script type="application/ld+json">${safeJson(schema)}</script>`;
     const body=`
 <div class="topbar"><div class="wrap"><div>CONROE, TEXAS • BUILT FOR THE RIDE</div><div>Fitment help: <a href="tel:+19362287655">(936) 228-7655</a></div></div></div>
-<nav class="nav"><div class="wrap"><a class="brand" href="/">PRECISION <span>ATV</span></a><div class="navlinks"><a href="/shop">Shop</a><a href="/services">Service & Repair</a><a href="/#shop">Our Shop</a><a class="btn" href="tel:+19362287655">Call the shop</a></div><a class="mobile-call" href="tel:+19362287655">Call</a></div></nav>
+<nav class="nav"><div class="wrap"><a class="brand" href="/">PRECISION <span>ATV</span></a><div class="navlinks"><a href="/shop">Shop</a><a href="/services">Engine Builds & Tuning</a><a href="/#shop">Our Shop</a><a class="btn" href="tel:+19362287655">Call the shop</a></div><a class="mobile-call" href="tel:+19362287655">Call</a></div></nav>
 <section class="product-page"><div class="wrap">
 <div class="breadcrumbs"><a href="/">Home</a><span>›</span><a href="/shop">Shop</a><span>›</span><span>${esc(p.productType||'Product')}</span></div>
 <div class="product-detail">
@@ -63,14 +63,14 @@ export default async function handler(req,res){
     <div class="trust-row">
       <div><b>Real shop support</b><span>Call before ordering if you need fitment help.</span></div>
       <div><b>Secure checkout</b><span>Payment, tax and shipping are handled by Shopify.</span></div>
-      <div><b>Conroe, Texas</b><span>Backed by a working powersports shop.</span></div>
+      <div><b>Conroe, Texas</b><span>Backed by an engine-building and tuning shop.</span></div>
     </div>
   </div>
 </div>
 <div class="product-copy"><div><div class="kicker">Product details</div><h2>What you need to know.</h2></div><div class="description">${p.descriptionHtml||'<p>Contact Precision ATV for specifications and fitment information.</p>'}</div></div>
 </div></section>
-<section class="band"><div class="wrap"><div><h2>Not sure it fits?</h2><p>Talk to the shop before you order. We’ll help match the part to your machine.</p></div><a class="btn" href="tel:+19362287655">Call (936) 228-7655</a></div></section>
-<footer class="footer"><div class="wrap footer-grid"><div><div class="brand">PRECISION <span>ATV</span></div><p>1801 N Loop 336 E • Conroe, TX 77301</p></div><div class="policy-links"><a href="/shop">Shop</a><a href="/services">Service</a><a href="https://precisionatvfab.com/policies/refund-policy">Returns</a><a href="https://precisionatvfab.com/policies/privacy-policy">Privacy</a></div></div></footer>
+<section class="band"><div class="wrap"><div><h2>Not sure it fits?</h2><p>Talk to our engine team before you order. We’ll help match the engine, part, or tune to your application.</p></div><a class="btn" href="tel:+19362287655">Call (936) 228-7655</a></div></section>
+<footer class="footer"><div class="wrap footer-grid"><div><div class="brand">PRECISION <span>ATV</span></div><p>1801 N Loop 336 E • Conroe, TX 77301</p></div><div class="policy-links"><a href="/shop">Shop</a><a href="/services">Engine Builds & Tuning</a><a href="https://precisionatvfab.com/policies/refund-policy">Returns</a><a href="https://precisionatvfab.com/policies/privacy-policy">Privacy</a></div></div></footer>
 <script>
 const variants=${safeJson(variants.map(v=>({id:v.id,title:v.title,available:v.availableForSale,price:v.price?.amount||0,currency:v.price?.currencyCode||'USD'})))};
 function swapImage(btn,url){document.getElementById('mainImage').src=url;document.querySelectorAll('.thumb').forEach(x=>x.classList.remove('active'));btn.classList.add('active')}
