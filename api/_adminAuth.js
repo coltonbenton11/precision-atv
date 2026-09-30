@@ -1,7 +1,7 @@
 import {createHash,createHmac,timingSafeEqual} from 'node:crypto';
 
 const FALLBACK_HASH='a7fb265a91b2972e66d1869165a86196d61fcfeccecef7536848a5808725e28c';
-const SESSION_LABEL='precision-atv-admin-v1';
+const SESSION_LABEL='precision-atv-admin-v2';
 
 function sha(value){return createHash('sha256').update(String(value||'')).digest('hex')}
 function secret(){return process.env.DASHBOARD_KEY||FALLBACK_HASH}
@@ -25,7 +25,7 @@ export function cookieValue(req,name){
 }
 export function isAdmin(req){return safeEqual(cookieValue(req,'patv_admin'),sessionToken())}
 export function adminCookie(){
-  return `patv_admin=${sessionToken()}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=28800`;
+  return `patv_admin=${sessionToken()}; Path=/; HttpOnly; Secure; SameSite=Strict`;
 }
 export function clearAdminCookie(){
   return 'patv_admin=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0';
