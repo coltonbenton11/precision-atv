@@ -14,6 +14,8 @@
   "rewrites": [
     {"source":"/shop","destination":"/shop.html"},
     {"source":"/services","destination":"/services.html"},
-    {"source":"/analytics","destination":"/analytics.html"}
+    {"source":"/analytics","destination":"/analytics.html"},
+    {"source":"/products/:handle","destination":"/api/product-page?handle=:handle"},
+    {"source":"/sitemap.xml","destination":"/api/sitemap"}
   ]
 }
