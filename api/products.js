@@ -1,4 +1,31 @@
-const FALLBACK=[
+const API_VERSION='2026-07';
+const SHOP='https://precisionatv-com.myshopify.com/cdn/shop/files/';
+
+const IMAGE_FALLBACKS={
+  'rzr xp turbo':SHOP+'2017-2021-polaris-rzr-xp-turbo-remanufactured-rebuilt-engine-oem-spec-1-year-warranty-2825799.jpg?v=1774717627&width=900',
+  'ranger xp 1000':SHOP+'2017-2025-polaris-ranger-xp-1000-remanufactured-rebuilt-engine-oem-spec-1-year-warranty-6618614.jpg?v=1767591686&width=900',
+  'ranger xp 570':SHOP+'2015-2016-polaris-ranger-xp-570-remanufactured-rebuilt-engine-oem-spec-1-year-warranty-5150904.jpg?v=1767591684&width=900',
+  'sportsman':SHOP+'polaris-sportsman-2015-2026-1000-remanufactured-rebuilt-engine-oem-spec-1-year-warranty-7139307.png?v=1768503129&width=900',
+  'can-am 570 outlander/renegade hot rods':SHOP+'can-am-570-outlanderrenegade-hot-rods-bottom-end-kit-hr00193-7835465.jpg?v=1783500786&width=900',
+  'outlander 570 renegade 570 top end':SHOP+'can-am-outlander-570-renegade-570-top-end-rebuild-kit-cylinders-pistons-2144951.png?v=1767508808&width=900',
+  'outlander 1000 performance bench ecu':SHOP+'can-am-outlander-1000-performance-bench-ecu-reflash-must-send-ecu-960371.jpg?v=1733132123&width=900',
+  'renegade 1000 performance bench ecu':SHOP+'can-am-renegade-1000-performance-bench-ecu-reflash-must-send-ecu-209622.jpg?v=1733132122&width=900',
+  'renegade 850 performance bench ecu':SHOP+'can-am-renegade-850-performance-bench-ecu-reflash-must-send-ecu-871995.jpg?v=1733132122&width=900',
+  'hot cams':SHOP+'hot-cams-shim-conversion-kit-pol-ind-vic-hc00134-5567914.jpg?v=1783500786&width=900',
+  'ngk':SHOP+'ngk-spark-plug-9383310-93833-4377742.jpg?v=1783500786&width=900',
+  'rs1 diff':SHOP+'polaris-rs1-diff-swap-kit-for-the-polaris-rzr-1000-xp-and-xp4-715437.jpg?v=1744679774&width=900'
+};
+const GENERIC_POLARIS=SHOP+'polaris-rzr-1000-s-2016-2022-remanufactured-rebuilt-engine-oem-spec-1-year-warranty-9264263.jpg?v=1767591684&width=900';
+const GENERIC_CANAM=SHOP+'2018-2026-can-am-maverick-sport-1000-remanufactured-rebuilt-engine-oem-spec-1-year-warranty-2176874.jpg?v=1776636906&width=900';
+
+function fallbackImage(title=''){
+  const s=title.toLowerCase();
+  for(const [key,url] of Object.entries(IMAGE_FALLBACKS))if(s.includes(key))return url;
+  if(s.includes('can-am')||s.includes('canam'))return GENERIC_CANAM;
+  if(s.includes('polaris')||s.includes('rzr')||s.includes('ranger'))return GENERIC_POLARIS;
+  return GENERIC_POLARIS;
+}
+const RAW=[
   ['2017-2021 POLARIS RZR XP TURBO Remanufactured Engine','Engines',4150],
   ['Polaris Sportsman 2015-2026 1000 Remanufactured Engine','Engines',3850],
   ['Polaris Sportsman 2009-2026 850 Remanufactured Engine','Engines',3850],
@@ -32,10 +59,28 @@ const FALLBACK=[
   ['CAN-AM Outlander 1000 Performance Bench ECU Reflash','ECU Tuning',189],
   ['Precision ATV BAR ONLY Can-Am Big Game Winch Retrieval System','Accessories',499.99],
   ['Precision ATV Can-Am Big Game Winch Retrieval System','Accessories',729.99]
-].map((x,i)=>({id:`fallback-${i}`,handle:`fallback-${i}`,title:x[0],productType:x[1],vendor:'Precision ATV',price:String(x[2]),currency:'USD',image:null,variantId:null,available:true}));
+];
+const FALLBACK=RAW.map((x,i)=>({id:`fallback-${i}`,handle:`fallback-${i}`,title:x[0],productType:x[1],vendor:'Precision ATV',price:String(x[2]),currency:'USD',image:fallbackImage(x[0]),variantId:null,available:true}));
+
 export default async function handler(req,res){
-  const domain=process.env.SHOPIFY_STORE_DOMAIN,token=process.env.SHOPIFY_STOREFRONT_TOKEN;const first=Math.min(Number(req.query.first||100),100);
-  if(!domain||!token)return res.status(200).json({mode:'preview',products:FALLBACK.slice(0,first)});
-  const query=`query Products($first:Int!){products(first:$first,sortKey:BEST_SELLING){nodes{id handle title productType vendor featuredImage{url altText} variants(first:10){nodes{id title availableForSale price{amount currencyCode}}}}}}`;
-  try{const r=await fetch(`https://${domain}/api/2026-07/graphql.json`,{method:'POST',headers:{'content-type':'application/json','X-Shopify-Storefront-Access-Token':token},body:JSON.stringify({query,variables:{first}})});const j=await r.json();if(j.errors)throw new Error(j.errors[0]?.message||'Shopify error');const products=(j.data?.products?.nodes||[]).map(p=>{const v=p.variants.nodes.find(x=>x.availableForSale)||p.variants.nodes[0];return{id:p.id,handle:p.handle,title:p.title,productType:p.productType,vendor:p.vendor,image:p.featuredImage?.url||null,variantId:v?.id||null,price:v?.price?.amount||0,currency:v?.price?.currencyCode||'USD',available:!!v?.availableForSale}});res.setHeader('Cache-Control','public, s-maxage=120, stale-while-revalidate=600');return res.status(200).json({mode:'shopify',products})}catch(e){return res.status(200).json({mode:'preview',warning:e.message,products:FALLBACK.slice(0,first)})}
+  const rawDomain=process.env.SHOPIFY_STORE_DOMAIN||'';
+  const domain=rawDomain.replace(/^https?:\/\//,'').replace(/\/$/,'');
+  const token=process.env.SHOPIFY_STOREFRONT_TOKEN||process.env.SHOPIFY_STOREFRONT_ACCESS_TOKEN||process.env.SHOPIFY_STOREFRONT_PUBLIC_ACCESS_TOKEN;
+  const first=Math.min(Number(req.query.first||100),100);
+  if(!domain||!token)return res.status(200).json({mode:'preview',warning:'Shopify Storefront credentials are not available to this deployment.',products:FALLBACK.slice(0,first)});
+  const query=`query Products($first:Int!){products(first:$first,sortKey:BEST_SELLING){nodes{id handle title productType vendor featuredImage{url altText} images(first:1){nodes{url altText}} media(first:1){nodes{previewImage{url altText}}} variants(first:10){nodes{id title availableForSale price{amount currencyCode}}}}}}`;
+  try{
+    const r=await fetch(`https://${domain}/api/${API_VERSION}/graphql.json`,{method:'POST',headers:{'content-type':'application/json','X-Shopify-Storefront-Access-Token':token},body:JSON.stringify({query,variables:{first}})});
+    const j=await r.json();
+    if(!r.ok||j.errors)throw new Error(j.errors?.[0]?.message||`Shopify returned HTTP ${r.status}`);
+    const products=(j.data?.products?.nodes||[]).map(p=>{
+      const v=p.variants?.nodes?.find(x=>x.availableForSale)||p.variants?.nodes?.[0];
+      const image=p.featuredImage?.url||p.images?.nodes?.[0]?.url||p.media?.nodes?.[0]?.previewImage?.url||fallbackImage(p.title);
+      return{id:p.id,handle:p.handle,title:p.title,productType:p.productType,vendor:p.vendor,image,variantId:v?.id||null,price:v?.price?.amount||0,currency:v?.price?.currencyCode||'USD',available:!!v?.availableForSale};
+    });
+    res.setHeader('Cache-Control','public, s-maxage=60, stale-while-revalidate=300');
+    return res.status(200).json({mode:'shopify',products});
+  }catch(e){
+    return res.status(200).json({mode:'preview',warning:e.message,products:FALLBACK.slice(0,first)});
+  }
 }
