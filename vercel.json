@@ -5,22 +5,70 @@
     {
       "source": "/(.*)",
       "headers": [
-        {"key":"X-Content-Type-Options","value":"nosniff"},
-        {"key":"Referrer-Policy","value":"strict-origin-when-cross-origin"},
-        {"key":"Permissions-Policy","value":"camera=(), microphone=(), geolocation=()"}
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        },
+        {
+          "key": "Permissions-Policy",
+          "value": "camera=(), microphone=(), geolocation=()"
+        }
+      ]
+    },
+    {
+      "source": "/admin(.*)",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        },
+        {
+          "key": "Cache-Control",
+          "value": "no-store"
+        }
       ]
     }
   ],
   "redirects": [
-    {"source":"/analytics","destination":"/admin","permanent":false},
-    {"source":"/analytics.html","destination":"/admin","permanent":false}
+    {
+      "source": "/analytics",
+      "destination": "/admin",
+      "permanent": false
+    },
+    {
+      "source": "/analytics.html",
+      "destination": "/admin",
+      "permanent": false
+    }
   ],
   "rewrites": [
-    {"source":"/shop","destination":"/shop.html"},
-    {"source":"/services","destination":"/services.html"},
-    {"source":"/admin","destination":"/admin.html"},
-    {"source":"/admin/dashboard","destination":"/admin-dashboard.html"},
-    {"source":"/products/:handle","destination":"/api/product-page?handle=:handle"},
-    {"source":"/sitemap.xml","destination":"/api/sitemap"}
+    {
+      "source": "/shop",
+      "destination": "/shop.html"
+    },
+    {
+      "source": "/services",
+      "destination": "/services.html"
+    },
+    {
+      "source": "/admin",
+      "destination": "/admin.html"
+    },
+    {
+      "source": "/admin/dashboard",
+      "destination": "/admin-dashboard.html"
+    },
+    {
+      "source": "/products/:handle",
+      "destination": "/api/product-page?handle=:handle"
+    },
+    {
+      "source": "/sitemap.xml",
+      "destination": "/api/sitemap"
+    }
   ]
 }
