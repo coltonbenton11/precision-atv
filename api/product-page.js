@@ -63,7 +63,13 @@ export default async function handler(req,res){
     <div class="detail-price"><span id="price">${esc(money(selected?.price?.amount,currency))}</span> ${compare}</div>
     <div id="availability" class="availability ${selected?.availableForSale?'in':'out'}">${selected?.availableForSale?'In stock / available to order':'Currently unavailable'}</div>
     ${variants.length>1?`<label class="field-label" for="variant">Choose option</label><select class="select" id="variant">${variantOptions}</select>`:''}
-    <div class="buy-row"><label><span class="field-label">Qty</span><input class="qty" id="qty" type="number" min="1" value="1"></label><button id="buyBtn" class="btn buy-main" onclick="buyNow()" ${selected?.availableForSale?'':'disabled'}>Buy securely through Shopify</button></div>
+    <div class="vin-field">
+      <label class="field-label" for="vin">Vehicle VIN <span class="required-mark">*</span></label>
+      <input class="vin-input" id="vin" type="text" inputmode="text" maxlength="17" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="Enter 17-character VIN" aria-describedby="vinHelp" required>
+      <div id="vinHelp" class="vin-help">Required for fitment verification before checkout. Letters I, O and Q are not used in standard VINs.</div>
+      <div id="vinError" class="vin-error" hidden>Please enter a valid 17-character VIN.</div>
+    </div>
+    <div class="buy-row"><label><span class="field-label">Qty</span><input class="qty" id="qty" type="number" min="1" value="1"></label><button id="buyBtn" class="btn buy-main" onclick="buyNow()" disabled>Buy securely through Shopify</button></div>
     <div class="trust-row">
       <div><b>Real shop support</b><span>Call before ordering if you need fitment help.</span></div>
       <div><b>Secure checkout</b><span>Payment, tax and shipping are handled by Shopify.</span></div>
@@ -79,9 +85,42 @@ export default async function handler(req,res){
 const variants=${safeJson(variants.map(v=>({id:v.id,title:v.title,available:v.availableForSale,price:v.price?.amount||0,currency:v.price?.currencyCode||'USD'})))};
 function swapImage(btn,url){document.getElementById('mainImage').src=url;document.querySelectorAll('.thumb').forEach(x=>x.classList.remove('active'));btn.classList.add('active')}
 function currentVariant(){const s=document.getElementById('variant');const id=s?s.value:${safeJson(selected?.id||'')};return variants.find(v=>v.id===id)||variants[0]}
-function updateVariant(){const v=currentVariant();if(!v)return;document.getElementById('price').textContent=money(v.price,v.currency);const a=document.getElementById('availability');a.textContent=v.available?'In stock / available to order':'Currently unavailable';a.className='availability '+(v.available?'in':'out');document.getElementById('buyBtn').disabled=!v.available}
+function normalizeVin(value){return String(value||'').toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,17)}
+function validVin(value){return /^[A-HJ-NPR-Z0-9]{17}$/.test(normalizeVin(value))}
+function updateBuyState(){
+  const v=currentVariant();
+  const vin=document.getElementById('vin');
+  const valid=validVin(vin?.value);
+  const btn=document.getElementById('buyBtn');
+  if(btn)btn.disabled=!(v&&v.available&&valid);
+  if(vin)vin.classList.toggle('invalid',vin.value.length>0&&!valid);
+  const err=document.getElementById('vinError');
+  if(err)err.hidden=!(vin?.value.length>0&&!valid);
+}
+function updateVariant(){const v=currentVariant();if(!v)return;document.getElementById('price').textContent=money(v.price,v.currency);const a=document.getElementById('availability');a.textContent=v.available?'In stock / available to order':'Currently unavailable';a.className='availability '+(v.available?'in':'out');updateBuyState()}
 document.getElementById('variant')?.addEventListener('change',updateVariant);
-async function buyNow(){const v=currentVariant();if(!v||!v.available)return;const qty=Math.max(1,Number(document.getElementById('qty').value)||1);track('add_to_cart',{currency:v.currency,value:Number(v.price)*qty,items:[{item_id:v.id,item_name:${safeJson(p.title)},price:Number(v.price),quantity:qty}]});const btn=document.getElementById('buyBtn');btn.disabled=true;btn.textContent='Starting checkout…';try{const r=await fetch('/api/cart',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({variantId:v.id,quantity:qty})});const d=await r.json();if(!d.checkoutUrl)throw new Error(d.error||'Unable to start checkout');track('begin_checkout',{currency:v.currency,value:Number(v.price)*qty,items:[{item_id:v.id,item_name:${safeJson(p.title)},price:Number(v.price),quantity:qty}]});location.href=d.checkoutUrl}catch(e){alert(e.message);btn.disabled=false;btn.textContent='Buy securely through Shopify'}}
+const vinInput=document.getElementById('vin');
+vinInput?.addEventListener('input',()=>{const normalized=normalizeVin(vinInput.value);if(vinInput.value!==normalized)vinInput.value=normalized;updateBuyState()});
+updateBuyState();
+async function buyNow(){
+  const v=currentVariant();if(!v||!v.available)return;
+  const vin=normalizeVin(document.getElementById('vin')?.value);
+  if(!validVin(vin)){
+    const input=document.getElementById('vin');const err=document.getElementById('vinError');
+    if(input){input.classList.add('invalid');input.focus()}
+    if(err)err.hidden=false;
+    return;
+  }
+  const qty=Math.max(1,Number(document.getElementById('qty').value)||1);
+  track('add_to_cart',{currency:v.currency,value:Number(v.price)*qty,items:[{item_id:v.id,item_name:${safeJson(p.title)},price:Number(v.price),quantity:qty}]});
+  const btn=document.getElementById('buyBtn');btn.disabled=true;btn.textContent='Starting checkout…';
+  try{
+    const r=await fetch('/api/cart',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({variantId:v.id,quantity:qty,vin})});
+    const d=await r.json();if(!d.checkoutUrl)throw new Error(d.error||'Unable to start checkout');
+    track('begin_checkout',{currency:v.currency,value:Number(v.price)*qty,items:[{item_id:v.id,item_name:${safeJson(p.title)},price:Number(v.price),quantity:qty}]});
+    location.href=d.checkoutUrl
+  }catch(e){alert(e.message);btn.textContent='Buy securely through Shopify';updateBuyState()}
+}
 track('view_item',{currency:${safeJson(currency)},value:Number(${safeJson(selected?.price?.amount||0)}),items:[{item_id:${safeJson(selected?.id||p.id)},item_name:${safeJson(p.title)}}]});
 </script>`;
     res.setHeader('Cache-Control','public, s-maxage=120, stale-while-revalidate=600');

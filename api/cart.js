@@ -21,7 +21,9 @@ export default async function handler(req,res){
 
   const variantId=body.variantId;
   const quantity=Math.max(1,Number(body.quantity)||1);
+  const vin=String(body.vin||'').toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,17);
   if(!variantId)return res.status(400).json({error:'Missing variant'});
+  if(!/^[A-HJ-NPR-Z0-9]{17}$/.test(vin))return res.status(400).json({error:'A valid 17-character VIN is required before checkout.'});
 
   const query=`mutation CartCreate($input:CartInput!){cartCreate(input:$input){cart{id checkoutUrl} userErrors{field message}}}`;
 
@@ -29,7 +31,10 @@ export default async function handler(req,res){
     const shopify=await fetch(`https://${domain}/api/${API_VERSION}/graphql.json`,{
       method:'POST',
       headers:{'content-type':'application/json','X-Shopify-Storefront-Access-Token':token},
-      body:JSON.stringify({query,variables:{input:{lines:[{merchandiseId:variantId,quantity}],attributes:[{key:'storefront',value:'precision-atv-vercel'}]}}})
+      body:JSON.stringify({query,variables:{input:{
+        lines:[{merchandiseId:variantId,quantity,attributes:[{key:'VIN',value:vin}]}],
+        attributes:[{key:'storefront',value:'precision-atv-vercel'},{key:'Vehicle VIN',value:vin}]
+      }}})
     });
 
     const text=await shopify.text();
