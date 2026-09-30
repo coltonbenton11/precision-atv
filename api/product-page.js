@@ -45,7 +45,7 @@ export default async function handler(req,res){
     const head=`<meta name="description" content="${esc(metaDescription)}"><link rel="canonical" href="${esc(canonical)}"><meta property="og:type" content="product"><meta property="og:title" content="${esc(metaTitle)}"><meta property="og:description" content="${esc(metaDescription)}"><meta property="og:url" content="${esc(canonical)}">${mainImage?`<meta property="og:image" content="${esc(mainImage)}">`:''}<script type="application/ld+json">${safeJson(schema)}</script>`;
     const body=`
 <div class="topbar"><div class="wrap"><div>CONROE, TEXAS • BUILT FOR THE RIDE</div><div>Fitment help: <a href="tel:+19362287655">(936) 228-7655</a></div></div></div>
-<nav class="nav"><div class="wrap"><a class="brand" href="/">PRECISION <span>ATV</span></a><div class="navlinks"><a href="/shop">Shop</a><a href="/services">Service & Repair</a><a href="/#shop">Our Shop</a><a class="btn" href="tel:+19362287655">Call the shop</a></div></div></nav>
+<nav class="nav"><div class="wrap"><a class="brand" href="/">PRECISION <span>ATV</span></a><div class="navlinks"><a href="/shop">Shop</a><a href="/services">Service & Repair</a><a href="/#shop">Our Shop</a><a class="btn" href="tel:+19362287655">Call the shop</a></div><a class="mobile-call" href="tel:+19362287655">Call</a></div></nav>
 <section class="product-page"><div class="wrap">
 <div class="breadcrumbs"><a href="/">Home</a><span>›</span><a href="/shop">Shop</a><span>›</span><span>${esc(p.productType||'Product')}</span></div>
 <div class="product-detail">
