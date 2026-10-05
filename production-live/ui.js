@@ -86,11 +86,14 @@ PP.view_schedule = () => {
   };
   jobs=[...jobs].sort(sorters[PP.scheduleSort]||sorters.priority);
   const body = PP.scheduleMode==='stages' ? PP.stageBoard(jobs) : PP.jobTable(jobs);
+  const sync=PP.state.clickupSync||{};
+  const syncLabel=sync.lastSuccessAt ? new Date(sync.lastSuccessAt).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}) : (sync.lastError ? 'Setup needed' : 'Pending');
   return `<div class="tabs"><button data-list="customer" class="${cls==='customer'?'active':''}">Customer</button><button data-list="patv" class="${cls==='patv'?'active':''}">PATV / Internal</button></div>
   <div class="summary">
     <div class="stat"><span>Active</span><strong>${allJobs.length}</strong></div><div class="stat"><span>Warranty</span><strong>${allJobs.filter(j=>j.jobType==='Warranty').length}</strong></div>
     <div class="stat"><span>Blocked</span><strong>${allJobs.filter(j=>j.blocked).length}</strong></div><div class="stat"><span>Awaiting approval</span><strong>${allJobs.filter(j=>j.awaitingApproval).length}</strong></div>
     <div class="stat"><span>Oldest invoice</span><strong>${PP.sortedJobs(cls).filter(j=>j.stage!=='Complete')[0]?.invoice || '—'}</strong></div>
+    <div class="stat" title="${PP.esc(sync.lastError||'Automatic ClickUp sync every 5 minutes')}"><span>ClickUp sync</span><strong>${PP.esc(syncLabel)}</strong></div>
   </div>
   <div class="card"><div class="card-head"><div><h2>${cls==='customer'?'Customer Production':'PATV / Internal'}</h2><p>${q?`Showing ${jobs.length} of ${allJobs.length} active jobs.`:(cls==='customer'?'Warranty overrides; otherwise sorted by invoice number.':'Internal work stays out of customer priority.')}</p></div><div class="view-toggle"><button class="btn ${PP.scheduleMode==='table'?'active':''}" data-schedule-mode="table">Table</button><button class="btn ${PP.scheduleMode==='stages'?'active':''}" data-schedule-mode="stages">Stage Columns</button></div></div>
     <div class="production-tools">
