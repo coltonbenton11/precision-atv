@@ -29,7 +29,7 @@ PP.render = () => {
 PP.jobTable = (jobs) => {
   if (!jobs.length) return '<div class="empty">No jobs here.</div>';
   const canFlag = ['owner','manager'].includes(PP.profile.role);
-  return `<div class="table-wrap"><table><thead><tr><th>Invoice</th><th>Customer</th><th>ClickUp tag</th><th>ClickUp Status</th><th>Flag / Type</th><th>Engine</th><th>Stage</th><th>Assigned</th><th>Planned</th><th>Status</th></tr></thead><tbody>${jobs.map(j => `
+  return `<div class="table-wrap"><table><thead><tr><th>Invoice</th><th>Customer</th><th>ClickUp tag</th><th>ClickUp Status</th><th>Flag / Type</th><th>Engine</th><th>Stage</th><th>Planned</th><th>Status</th></tr></thead><tbody>${jobs.map(j => `
     <tr class="click" data-job="${j.id}">
       <td class="inv">${PP.esc(j.invoice)}</td>
       <td>${PP.esc(j.customer)}</td>
@@ -38,7 +38,7 @@ PP.jobTable = (jobs) => {
       <td>${canFlag ? `<select class="type-inline" data-jobtype="${j.id}">${PP.TYPES.map(t=>`<option ${t===j.jobType?'selected':''}>${PP.esc(t)}</option>`).join('')}</select>` : PP.esc(j.jobType)}</td>
       <td>${PP.esc(j.engine)}</td>
       <td>${PP.esc(j.stage)}<div class="progress"><i style="width:${PP.progress(j)}%"></i></div></td>
-      <td>${PP.esc(j.assigned || 'Unassigned')}</td><td>${j.plannedDate || '—'}</td><td>${PP.badge(j)}</td>
+      <td>${j.plannedDate || '—'}</td><td>${PP.badge(j)}</td>
     </tr>`).join('')}</tbody></table></div>`;
 };
 
@@ -58,7 +58,7 @@ PP.view_calendar = () => {
   const jobs = PP.state.jobs.filter(j => j.stage !== 'Complete' && j.plannedDate).sort((a,b)=>a.plannedDate.localeCompare(b.plannedDate));
   let body = '<div class="empty">No work has been scheduled yet.</div>';
   if (jobs.length) {
-    body = `<div class="table-wrap"><table><thead><tr><th>Date</th><th>Invoice</th><th>Customer</th><th>Stage</th><th>Assigned</th></tr></thead><tbody>${jobs.map(j=>`<tr data-job="${j.id}" class="click"><td>${j.plannedDate}</td><td>${PP.esc(j.invoice)}</td><td>${PP.esc(j.customer)}</td><td>${PP.esc(j.stage)}</td><td>${PP.esc(j.assigned||'Unassigned')}</td></tr>`).join('')}</tbody></table></div>`;
+    body = `<div class="table-wrap"><table><thead><tr><th>Date</th><th>Invoice</th><th>Customer</th><th>Stage</th></tr></thead><tbody>${jobs.map(j=>`<tr data-job="${j.id}" class="click"><td>${j.plannedDate}</td><td>${PP.esc(j.invoice)}</td><td>${PP.esc(j.customer)}</td><td>${PP.esc(j.stage)}</td></tr>`).join('')}</tbody></table></div>`;
   }
   return `<div class="card"><div class="card-head"><div><h2>Production Calendar</h2><p>Only intentionally scheduled work appears here.</p></div></div>${body}</div>`;
 };
