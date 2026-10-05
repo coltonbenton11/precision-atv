@@ -49,11 +49,14 @@ PP.stageBoard = (jobs) => {
     <b>${PP.esc(j.customer)}</b>
     ${j.plannedDate?`<small>Planned ${PP.esc(j.plannedDate)}</small>`:''}
   </div>`;
-  return `<div class="stage-board">${stages.map(stage=>{const col=jobs.filter(j=>j.stage===stage);return `
-    <section class="stage-column" data-stage-drop="${PP.esc(stage)}">
-      <header><div><strong>${PP.esc(stage)}</strong><small>${col.length} job${col.length===1?'':'s'}</small></div></header>
-      <div class="stage-column-body">${col.length?col.map(card).join(''):'<div class="stage-empty">Drop jobs here</div>'}</div>
-    </section>`}).join('')}</div>`;
+  return `<div class="stage-board-wrap">
+    <div class="stage-board" data-stage-board>${stages.map(stage=>{const col=jobs.filter(j=>j.stage===stage);return `
+      <section class="stage-column" data-stage-drop="${PP.esc(stage)}">
+        <header><div><strong>${PP.esc(stage)}</strong><small>${col.length} job${col.length===1?'':'s'}</small></div></header>
+        <div class="stage-column-body">${col.length?col.map(card).join(''):'<div class="stage-empty">Drop jobs here</div>'}</div>
+      </section>`}).join('')}</div>
+    <div class="stage-scrollbar" data-stage-scrollbar><div style="width:${stages.length*250}px;height:1px"></div></div>
+  </div>`;
 };
 
 PP.view_schedule = () => {
@@ -166,6 +169,7 @@ PP.bindView = () => {
     x.addEventListener('dragleave',()=>x.classList.remove('dragover'));
     x.addEventListener('drop',e=>{e.preventDefault();x.classList.remove('dragover');let id=e.dataTransfer.getData('text/plain'),j=PP.state.jobs.find(j=>j.id===id);if(!j)return;let old=j.stage,next=x.dataset.stageDrop;if(old===next)return;j.stage=next;j.stageEnteredAt=new Date().toISOString();j.awaitingApproval=false;j.pendingNext='';j.events=j.events||[];j.events.push({time:new Date().toISOString(),text:'Stage changed: '+old+' → '+next,by:PP.profile.display_name});PP.save();PP.render()});
   });
+  {const board=document.querySelector('[data-stage-board]'),bar=document.querySelector('[data-stage-scrollbar]');if(board&&bar){let lock=false;board.addEventListener('scroll',()=>{if(lock)return;lock=true;bar.scrollLeft=board.scrollLeft;requestAnimationFrame(()=>lock=false)});bar.addEventListener('scroll',()=>{if(lock)return;lock=true;board.scrollLeft=bar.scrollLeft;requestAnimationFrame(()=>lock=false)})}}
   document.querySelectorAll('[data-cal-class]').forEach(x=>x.onclick=()=>{PP.calendarClass=x.dataset.calClass;PP.render()});
   document.querySelector('[data-cal-prev]')?.addEventListener('click',()=>{PP.calendarOffset=(PP.calendarOffset||0)-1;PP.render()});
   document.querySelector('[data-cal-next]')?.addEventListener('click',()=>{PP.calendarOffset=(PP.calendarOffset||0)+1;PP.render()});
