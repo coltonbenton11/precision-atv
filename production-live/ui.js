@@ -28,9 +28,14 @@ PP.render = () => {
 
 PP.jobTable = (jobs) => {
   if (!jobs.length) return '<div class="empty">No jobs here.</div>';
-  return `<div class="table-wrap"><table><thead><tr><th>Invoice</th><th>Customer</th><th>Type</th><th>Engine</th><th>Stage</th><th>Assigned</th><th>Planned</th><th>Status</th></tr></thead><tbody>${jobs.map(j => `
+  const canFlag = ['owner','manager'].includes(PP.profile.role);
+  return `<div class="table-wrap"><table><thead><tr><th>Invoice</th><th>Customer</th><th>ClickUp tag</th><th>Flag / Type</th><th>Engine</th><th>Stage</th><th>Assigned</th><th>Planned</th><th>Status</th></tr></thead><tbody>${jobs.map(j => `
     <tr class="click" data-job="${j.id}">
-      <td class="inv">${PP.esc(j.invoice)}</td><td>${PP.esc(j.customer)}</td><td>${PP.esc(j.jobType)}</td><td>${PP.esc(j.engine)}</td>
+      <td class="inv">${PP.esc(j.invoice)}</td>
+      <td>${PP.esc(j.customer)}</td>
+      <td>${(j.sourceTags||[]).length ? (j.sourceTags||[]).map(t=>`<span class="badge">${PP.esc(t)}</span>`).join(' ') : '<span class="muted">—</span>'}</td>
+      <td>${canFlag ? `<select class="type-inline" data-jobtype="${j.id}">${PP.TYPES.map(t=>`<option ${t===j.jobType?'selected':''}>${PP.esc(t)}</option>`).join('')}</select>` : PP.esc(j.jobType)}</td>
+      <td>${PP.esc(j.engine)}</td>
       <td>${PP.esc(j.stage)}<div class="progress"><i style="width:${PP.progress(j)}%"></i></div></td>
       <td>${PP.esc(j.assigned || 'Unassigned')}</td><td>${j.plannedDate || '—'}</td><td>${PP.badge(j)}</td>
     </tr>`).join('')}</tbody></table></div>`;
@@ -96,7 +101,8 @@ PP.view_completed = () => PP.jobTable(PP.state.jobs.filter(j=>j.stage==='Complet
 PP.view_team = () => `<div class="card"><div class="card-head"><div><h2>Team</h2><p>New signups remain inactive until the owner approves them.</p></div></div>${PP.team.map(p=>`<div class="team-row"><div><strong>${PP.esc(p.display_name)}</strong><small>${p.id===PP.user.id?'Your account':'Team account'}</small></div><select data-role="${p.id}" ${p.id===PP.user.id?'disabled':''}><option value="technician" ${p.role==='technician'?'selected':''}>Technician</option><option value="manager" ${p.role==='manager'?'selected':''}>Manager</option><option value="owner" ${p.role==='owner'?'selected':''}>Owner</option></select><label><input type="checkbox" data-active="${p.id}" ${p.active?'checked':''} ${p.id===PP.user.id?'disabled':''}> Active</label><button class="btn" data-team-save="${p.id}" ${p.id===PP.user.id?'disabled':''}>Save</button></div>`).join('')}</div>`;
 
 PP.bindView = () => {
-  document.querySelectorAll('[data-job]').forEach(x=>x.onclick=()=>PP.openJob(x.dataset.job));
+  document.querySelectorAll('[data-job]').forEach(x=>x.onclick=e=>{if(e.target.closest('[data-jobtype]'))return;PP.openJob(x.dataset.job)});
+  document.querySelectorAll('[data-jobtype]').forEach(x=>x.onchange=e=>{e.stopPropagation();let j=PP.state.jobs.find(j=>j.id===x.dataset.jobtype);if(!j)return;j.jobType=x.value;if(x.value==='Stock / Internal')j.productionClass='patv';j.events=j.events||[];j.events.push({time:new Date().toISOString(),text:'Flag / type changed to '+x.value,by:PP.profile.display_name});PP.save();PP.render()});
   document.querySelectorAll('[data-list]').forEach(x=>x.onclick=()=>{PP.list=x.dataset.list;PP.render()});
   document.querySelectorAll('[data-q]').forEach(x=>x.onchange=()=>{PP.state.queueOverrides[x.dataset.q]=Number(x.value)||0;PP.save();PP.render()});
   document.querySelectorAll('[data-inv]').forEach(x=>x.onchange=()=>{const r=PP.state.inventory.find(i=>i.id===x.dataset.inv);r[x.dataset.field]=Number(x.value)||0;PP.save();PP.render()});
