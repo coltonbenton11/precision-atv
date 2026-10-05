@@ -55,12 +55,50 @@ PP.view_schedule = () => {
 };
 
 PP.view_calendar = () => {
-  const jobs = PP.state.jobs.filter(j => j.stage !== 'Complete' && j.plannedDate).sort((a,b)=>a.plannedDate.localeCompare(b.plannedDate));
-  let body = '<div class="empty">No work has been scheduled yet.</div>';
-  if (jobs.length) {
-    body = `<div class="table-wrap"><table><thead><tr><th>Date</th><th>Invoice</th><th>Customer</th><th>Stage</th></tr></thead><tbody>${jobs.map(j=>`<tr data-job="${j.id}" class="click"><td>${j.plannedDate}</td><td>${PP.esc(j.invoice)}</td><td>${PP.esc(j.customer)}</td><td>${PP.esc(j.stage)}</td></tr>`).join('')}</tbody></table></div>`;
-  }
-  return `<div class="card"><div class="card-head"><div><h2>Production Calendar</h2><p>Only intentionally scheduled work appears here.</p></div></div>${body}</div>`;
+  PP.calendarOffset = Number(PP.calendarOffset || 0);
+  PP.calendarClass = PP.calendarClass || 'customer';
+  const cls = PP.calendarClass;
+  const pad=n=>String(n).padStart(2,'0');
+  const iso=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+  const start=new Date(); start.setHours(12,0,0,0);
+  const day=start.getDay(), delta=day===0?-6:1-day;
+  start.setDate(start.getDate()+delta+(PP.calendarOffset*7));
+  const days=Array.from({length:7},(_,i)=>{const d=new Date(start);d.setDate(start.getDate()+i);return d});
+  const end=days[6];
+  const active=PP.state.jobs.filter(j=>j.stage!=='Complete' && (cls==='all'||j.productionClass===cls));
+  const unscheduled=PP.sortedJobs(cls==='all'?'customer':cls).filter(j=>j.stage!=='Complete'&&!j.plannedDate);
+  const allUnscheduled=cls==='all'?PP.state.jobs.filter(j=>j.stage!=='Complete'&&!j.plannedDate):unscheduled;
+  const today=iso(new Date());
+  const monthLabel=start.toLocaleDateString(undefined,{month:'long',day:'numeric'})+' – '+end.toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'});
+  const card=j=>`<div class="planner-job ${j.jobType==='Warranty'?'warranty':''} ${j.blocked?'blocked':''}" draggable="true" data-drag-job="${j.id}" data-job="${j.id}">
+      <div class="planner-job-top"><strong>${PP.esc(j.invoice||'No invoice')}</strong><span>${PP.esc(j.jobType)}</span></div>
+      <b>${PP.esc(j.customer)}</b>
+      <small>${PP.esc(j.stage)}</small>
+    </div>`;
+  return `<div class="planner-toolbar">
+      <div class="tabs planner-tabs">
+        <button data-cal-class="customer" class="${cls==='customer'?'active':''}">Customer</button>
+        <button data-cal-class="patv" class="${cls==='patv'?'active':''}">PATV</button>
+        <button data-cal-class="all" class="${cls==='all'?'active':''}">All</button>
+      </div>
+      <div class="planner-nav"><button class="btn" data-cal-prev>‹</button><button class="btn" data-cal-today>Today</button><button class="btn" data-cal-next>›</button></div>
+    </div>
+    <div class="card planner-card">
+      <div class="card-head"><div><h2>Production Planner</h2><p>${monthLabel} · Drag jobs between days to reschedule.</p></div><span class="badge">${active.length} active</span></div>
+      <div class="planner-week">
+        ${days.map(d=>{const key=iso(d),jobs=active.filter(j=>j.plannedDate===key).sort((a,b)=>PP.invoiceNo(a.invoice)-PP.invoiceNo(b.invoice));return `
+          <section class="planner-day ${key===today?'today':''}" data-drop-date="${key}">
+            <header><span>${d.toLocaleDateString(undefined,{weekday:'short'})}</span><strong>${d.getDate()}</strong><i>${jobs.length}</i></header>
+            <div class="planner-drop">${jobs.map(card).join('')||'<div class="planner-empty">Drop job here</div>'}</div>
+          </section>`}).join('')}
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-head"><div><h3>Unscheduled</h3><p>Drag a job onto a day above to plan it.</p></div><span class="badge">${allUnscheduled.length}</span></div>
+      <div class="unscheduled-grid" data-drop-unscheduled>
+        ${allUnscheduled.length?allUnscheduled.map(card).join(''):'<div class="empty">Everything in this view is scheduled.</div>'}
+      </div>
+    </div>`;
 };
 
 PP.plan = (f) => {
@@ -105,6 +143,18 @@ PP.bindView = () => {
   document.querySelectorAll('[data-job]').forEach(x=>x.onclick=e=>{if(e.target.closest('[data-jobtype]'))return;PP.openJob(x.dataset.job)});
   document.querySelectorAll('[data-jobtype]').forEach(x=>x.onchange=e=>{e.stopPropagation();let j=PP.state.jobs.find(j=>j.id===x.dataset.jobtype);if(!j)return;j.jobType=x.value;if(x.value==='Stock / Internal')j.productionClass='patv';j.events=j.events||[];j.events.push({time:new Date().toISOString(),text:'Flag / type changed to '+x.value,by:PP.profile.display_name});PP.save();PP.render()});
   document.querySelectorAll('[data-list]').forEach(x=>x.onclick=()=>{PP.list=x.dataset.list;PP.render()});
+  document.querySelectorAll('[data-cal-class]').forEach(x=>x.onclick=()=>{PP.calendarClass=x.dataset.calClass;PP.render()});
+  document.querySelector('[data-cal-prev]')?.addEventListener('click',()=>{PP.calendarOffset=(PP.calendarOffset||0)-1;PP.render()});
+  document.querySelector('[data-cal-next]')?.addEventListener('click',()=>{PP.calendarOffset=(PP.calendarOffset||0)+1;PP.render()});
+  document.querySelector('[data-cal-today]')?.addEventListener('click',()=>{PP.calendarOffset=0;PP.render()});
+  document.querySelectorAll('[data-drag-job]').forEach(x=>x.addEventListener('dragstart',e=>{e.dataTransfer.setData('text/plain',x.dataset.dragJob);e.dataTransfer.effectAllowed='move'}));
+  document.querySelectorAll('[data-drop-date]').forEach(x=>{
+    x.addEventListener('dragover',e=>{e.preventDefault();x.classList.add('dragover')});
+    x.addEventListener('dragleave',()=>x.classList.remove('dragover'));
+    x.addEventListener('drop',e=>{e.preventDefault();x.classList.remove('dragover');let id=e.dataTransfer.getData('text/plain'),j=PP.state.jobs.find(j=>j.id===id);if(!j)return;j.plannedDate=x.dataset.dropDate;j.events=j.events||[];j.events.push({time:new Date().toISOString(),text:'Planned for '+j.plannedDate,by:PP.profile.display_name});PP.save();PP.render()});
+  });
+  document.querySelector('[data-drop-unscheduled]')?.addEventListener('dragover',e=>e.preventDefault());
+  document.querySelector('[data-drop-unscheduled]')?.addEventListener('drop',e=>{e.preventDefault();let id=e.dataTransfer.getData('text/plain'),j=PP.state.jobs.find(j=>j.id===id);if(!j)return;j.plannedDate='';j.events=j.events||[];j.events.push({time:new Date().toISOString(),text:'Removed from production calendar',by:PP.profile.display_name});PP.save();PP.render()});
   document.querySelectorAll('[data-q]').forEach(x=>x.onchange=()=>{PP.state.queueOverrides[x.dataset.q]=Number(x.value)||0;PP.save();PP.render()});
   document.querySelectorAll('[data-inv]').forEach(x=>x.onchange=()=>{const r=PP.state.inventory.find(i=>i.id===x.dataset.inv);r[x.dataset.field]=Number(x.value)||0;PP.save();PP.render()});
   document.querySelector('[data-schedule-all]')?.addEventListener('click',PP.scheduleAll);
