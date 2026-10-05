@@ -65,6 +65,41 @@
       "permanent": true
     },
     {
+      "source": "/pages/dyno-info",
+      "destination": "/services",
+      "permanent": true
+    },
+    {
+      "source": "/pages/choose-your-brand",
+      "destination": "/shop",
+      "permanent": true
+    },
+    {
+      "source": "/pages/store",
+      "destination": "/shop",
+      "permanent": true
+    },
+    {
+      "source": "/pages/shifter-sale",
+      "destination": "/shop",
+      "permanent": true
+    },
+    {
+      "source": "/pages/flash_sales",
+      "destination": "/shop",
+      "permanent": true
+    },
+    {
+      "source": "/pages/return-policy",
+      "destination": "/policies/refund-policy",
+      "permanent": true
+    },
+    {
+      "source": "/pages/privacy-policy",
+      "destination": "/policies/privacy-policy",
+      "permanent": true
+    },
+    {
       "source": "/collections",
       "destination": "/shop",
       "permanent": true
