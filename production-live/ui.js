@@ -29,11 +29,12 @@ PP.render = () => {
 PP.jobTable = (jobs) => {
   if (!jobs.length) return '<div class="empty">No jobs here.</div>';
   const canFlag = ['owner','manager'].includes(PP.profile.role);
-  return `<div class="table-wrap"><table><thead><tr><th>Invoice</th><th>Customer</th><th>ClickUp tag</th><th>Flag / Type</th><th>Engine</th><th>Stage</th><th>Assigned</th><th>Planned</th><th>Status</th></tr></thead><tbody>${jobs.map(j => `
+  return `<div class="table-wrap"><table><thead><tr><th>Invoice</th><th>Customer</th><th>ClickUp tag</th><th>ClickUp Status</th><th>Flag / Type</th><th>Engine</th><th>Stage</th><th>Assigned</th><th>Planned</th><th>Status</th></tr></thead><tbody>${jobs.map(j => `
     <tr class="click" data-job="${j.id}">
       <td class="inv">${PP.esc(j.invoice)}</td>
       <td>${PP.esc(j.customer)}</td>
       <td>${(j.sourceTags||[]).length ? (j.sourceTags||[]).map(t=>`<span class="badge">${PP.esc(t)}</span>`).join(' ') : '<span class="muted">—</span>'}</td>
+      <td>${j.sourceStatus ? `<span class="badge">${PP.esc(j.sourceStatus)}</span>` : '<span class="muted">—</span>'}</td>
       <td>${canFlag ? `<select class="type-inline" data-jobtype="${j.id}">${PP.TYPES.map(t=>`<option ${t===j.jobType?'selected':''}>${PP.esc(t)}</option>`).join('')}</select>` : PP.esc(j.jobType)}</td>
       <td>${PP.esc(j.engine)}</td>
       <td>${PP.esc(j.stage)}<div class="progress"><i style="width:${PP.progress(j)}%"></i></div></td>
