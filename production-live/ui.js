@@ -62,15 +62,51 @@ PP.stageBoard = (jobs) => {
 PP.view_schedule = () => {
   const cls = PP.list || 'customer';
   PP.scheduleMode = PP.scheduleMode || 'table';
-  const jobs = PP.sortedJobs(cls).filter(j => j.stage !== 'Complete');
+  PP.scheduleSearch = PP.scheduleSearch || '';
+  PP.scheduleSort = PP.scheduleSort || 'priority';
+  const allJobs = PP.sortedJobs(cls).filter(j => j.stage !== 'Complete');
+  const q = PP.scheduleSearch.trim().toLowerCase();
+  let jobs = allJobs.filter(j => {
+    if (!q) return true;
+    const hay = [
+      j.invoice,j.invoiceNumber,j.customer,j.engine,j.stage,j.jobType,j.sourceStatus,
+      j.plannedDate,j.orderDate,j.blockerType,j.blockerNote,...(j.sourceTags||[])
+    ].join(' ').toLowerCase();
+    return hay.includes(q);
+  });
+  const stageIndex=s=>{const i=PP.STAGES.indexOf(s);return i<0?999:i};
+  const sorters={
+    priority:(a,b)=>((a.jobType==='Warranty'?0:1)-(b.jobType==='Warranty'?0:1))||PP.invoiceNo(a.invoice)-PP.invoiceNo(b.invoice),
+    invoiceAsc:(a,b)=>PP.invoiceNo(a.invoice)-PP.invoiceNo(b.invoice),
+    invoiceDesc:(a,b)=>PP.invoiceNo(b.invoice)-PP.invoiceNo(a.invoice),
+    customer:(a,b)=>String(a.customer||'').localeCompare(String(b.customer||'')),
+    stage:(a,b)=>stageIndex(a.stage)-stageIndex(b.stage)||PP.invoiceNo(a.invoice)-PP.invoiceNo(b.invoice),
+    planned:(a,b)=>String(a.plannedDate||'9999-12-31').localeCompare(String(b.plannedDate||'9999-12-31'))||PP.invoiceNo(a.invoice)-PP.invoiceNo(b.invoice),
+    blocked:(a,b)=>(Number(!!b.blocked)-Number(!!a.blocked))||PP.invoiceNo(a.invoice)-PP.invoiceNo(b.invoice)
+  };
+  jobs=[...jobs].sort(sorters[PP.scheduleSort]||sorters.priority);
   const body = PP.scheduleMode==='stages' ? PP.stageBoard(jobs) : PP.jobTable(jobs);
   return `<div class="tabs"><button data-list="customer" class="${cls==='customer'?'active':''}">Customer</button><button data-list="patv" class="${cls==='patv'?'active':''}">PATV / Internal</button></div>
   <div class="summary">
-    <div class="stat"><span>Active</span><strong>${jobs.length}</strong></div><div class="stat"><span>Warranty</span><strong>${jobs.filter(j=>j.jobType==='Warranty').length}</strong></div>
-    <div class="stat"><span>Blocked</span><strong>${jobs.filter(j=>j.blocked).length}</strong></div><div class="stat"><span>Awaiting approval</span><strong>${jobs.filter(j=>j.awaitingApproval).length}</strong></div>
-    <div class="stat"><span>Oldest invoice</span><strong>${jobs[0]?.invoice || '—'}</strong></div>
+    <div class="stat"><span>Active</span><strong>${allJobs.length}</strong></div><div class="stat"><span>Warranty</span><strong>${allJobs.filter(j=>j.jobType==='Warranty').length}</strong></div>
+    <div class="stat"><span>Blocked</span><strong>${allJobs.filter(j=>j.blocked).length}</strong></div><div class="stat"><span>Awaiting approval</span><strong>${allJobs.filter(j=>j.awaitingApproval).length}</strong></div>
+    <div class="stat"><span>Oldest invoice</span><strong>${PP.sortedJobs(cls).filter(j=>j.stage!=='Complete')[0]?.invoice || '—'}</strong></div>
   </div>
-  <div class="card"><div class="card-head"><div><h2>${cls==='customer'?'Customer Production':'PATV / Internal'}</h2><p>${cls==='customer'?'Warranty overrides; otherwise sorted by invoice number.':'Internal work stays out of customer priority.'}</p></div><div class="view-toggle"><button class="btn ${PP.scheduleMode==='table'?'active':''}" data-schedule-mode="table">Table</button><button class="btn ${PP.scheduleMode==='stages'?'active':''}" data-schedule-mode="stages">Stage Columns</button></div></div>${body}</div>`;
+  <div class="card"><div class="card-head"><div><h2>${cls==='customer'?'Customer Production':'PATV / Internal'}</h2><p>${q?`Showing ${jobs.length} of ${allJobs.length} active jobs.`:(cls==='customer'?'Warranty overrides; otherwise sorted by invoice number.':'Internal work stays out of customer priority.')}</p></div><div class="view-toggle"><button class="btn ${PP.scheduleMode==='table'?'active':''}" data-schedule-mode="table">Table</button><button class="btn ${PP.scheduleMode==='stages'?'active':''}" data-schedule-mode="stages">Stage Columns</button></div></div>
+    <div class="production-tools">
+      <label class="production-search"><span>Search</span><input type="search" data-schedule-search value="${PP.esc(PP.scheduleSearch)}" placeholder="Invoice, customer, engine, stage..."></label>
+      <label class="production-sort"><span>Sort</span><select data-schedule-sort>
+        <option value="priority" ${PP.scheduleSort==='priority'?'selected':''}>Priority / invoice</option>
+        <option value="invoiceAsc" ${PP.scheduleSort==='invoiceAsc'?'selected':''}>Invoice: low to high</option>
+        <option value="invoiceDesc" ${PP.scheduleSort==='invoiceDesc'?'selected':''}>Invoice: high to low</option>
+        <option value="customer" ${PP.scheduleSort==='customer'?'selected':''}>Customer: A to Z</option>
+        <option value="stage" ${PP.scheduleSort==='stage'?'selected':''}>Stage order</option>
+        <option value="planned" ${PP.scheduleSort==='planned'?'selected':''}>Planned date</option>
+        <option value="blocked" ${PP.scheduleSort==='blocked'?'selected':''}>Blocked first</option>
+      </select></label>
+      ${q?`<button class="btn ghost" data-clear-schedule-search>Clear</button>`:''}
+    </div>
+    ${body}</div>`;
 };
 
 PP.view_calendar = () => {
@@ -163,6 +199,9 @@ PP.bindView = () => {
   document.querySelectorAll('[data-jobtype]').forEach(x=>x.onchange=e=>{e.stopPropagation();let j=PP.state.jobs.find(j=>j.id===x.dataset.jobtype);if(!j)return;j.jobType=x.value;if(x.value==='Stock / Internal')j.productionClass='patv';j.events=j.events||[];j.events.push({time:new Date().toISOString(),text:'Flag / type changed to '+x.value,by:PP.profile.display_name});PP.save();PP.render()});
   document.querySelectorAll('[data-list]').forEach(x=>x.onclick=()=>{PP.list=x.dataset.list;PP.render()});
   document.querySelectorAll('[data-schedule-mode]').forEach(x=>x.onclick=()=>{PP.scheduleMode=x.dataset.scheduleMode;PP.render()});
+  document.querySelector('[data-schedule-sort]')?.addEventListener('change',e=>{PP.scheduleSort=e.target.value;PP.render()});
+  document.querySelector('[data-schedule-search]')?.addEventListener('input',e=>{PP.scheduleSearch=e.target.value;const pos=e.target.selectionStart;PP.render();requestAnimationFrame(()=>{const n=document.querySelector('[data-schedule-search]');if(n){n.focus();try{n.setSelectionRange(pos,pos)}catch(_){}}})});
+  document.querySelector('[data-clear-schedule-search]')?.addEventListener('click',()=>{PP.scheduleSearch='';PP.render();requestAnimationFrame(()=>document.querySelector('[data-schedule-search]')?.focus())});
   document.querySelectorAll('[data-stage-drag]').forEach(x=>x.addEventListener('dragstart',e=>{e.dataTransfer.setData('text/plain',x.dataset.stageDrag);e.dataTransfer.effectAllowed='move'}));
   document.querySelectorAll('[data-stage-drop]').forEach(x=>{
     x.addEventListener('dragover',e=>{e.preventDefault();x.classList.add('dragover')});
