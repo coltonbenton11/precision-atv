@@ -42,16 +42,32 @@ PP.jobTable = (jobs) => {
     </tr>`).join('')}</tbody></table></div>`;
 };
 
+PP.stageBoard = (jobs) => {
+  const stages=PP.STAGES.filter(s=>s!=='Complete');
+  const card=j=>`<div class="stage-job ${j.jobType==='Warranty'?'warranty':''} ${j.blocked?'blocked':''}" draggable="true" data-stage-drag="${j.id}" data-job="${j.id}">
+    <div class="stage-job-top"><strong>${PP.esc(j.invoice||'No invoice')}</strong><span>${PP.esc(j.jobType)}</span></div>
+    <b>${PP.esc(j.customer)}</b>
+    ${j.plannedDate?`<small>Planned ${PP.esc(j.plannedDate)}</small>`:''}
+  </div>`;
+  return `<div class="stage-board">${stages.map(stage=>{const col=jobs.filter(j=>j.stage===stage);return `
+    <section class="stage-column" data-stage-drop="${PP.esc(stage)}">
+      <header><div><strong>${PP.esc(stage)}</strong><small>${col.length} job${col.length===1?'':'s'}</small></div></header>
+      <div class="stage-column-body">${col.length?col.map(card).join(''):'<div class="stage-empty">Drop jobs here</div>'}</div>
+    </section>`}).join('')}</div>`;
+};
+
 PP.view_schedule = () => {
   const cls = PP.list || 'customer';
+  PP.scheduleMode = PP.scheduleMode || 'table';
   const jobs = PP.sortedJobs(cls).filter(j => j.stage !== 'Complete');
+  const body = PP.scheduleMode==='stages' ? PP.stageBoard(jobs) : PP.jobTable(jobs);
   return `<div class="tabs"><button data-list="customer" class="${cls==='customer'?'active':''}">Customer</button><button data-list="patv" class="${cls==='patv'?'active':''}">PATV / Internal</button></div>
   <div class="summary">
     <div class="stat"><span>Active</span><strong>${jobs.length}</strong></div><div class="stat"><span>Warranty</span><strong>${jobs.filter(j=>j.jobType==='Warranty').length}</strong></div>
     <div class="stat"><span>Blocked</span><strong>${jobs.filter(j=>j.blocked).length}</strong></div><div class="stat"><span>Awaiting approval</span><strong>${jobs.filter(j=>j.awaitingApproval).length}</strong></div>
     <div class="stat"><span>Oldest invoice</span><strong>${jobs[0]?.invoice || '—'}</strong></div>
   </div>
-  <div class="card"><div class="card-head"><div><h2>${cls==='customer'?'Customer Production':'PATV / Internal'}</h2><p>${cls==='customer'?'Warranty overrides; otherwise sorted by invoice number.':'Internal work stays out of customer priority.'}</p></div></div>${PP.jobTable(jobs)}</div>`;
+  <div class="card"><div class="card-head"><div><h2>${cls==='customer'?'Customer Production':'PATV / Internal'}</h2><p>${cls==='customer'?'Warranty overrides; otherwise sorted by invoice number.':'Internal work stays out of customer priority.'}</p></div><div class="view-toggle"><button class="btn ${PP.scheduleMode==='table'?'active':''}" data-schedule-mode="table">Table</button><button class="btn ${PP.scheduleMode==='stages'?'active':''}" data-schedule-mode="stages">Stage Columns</button></div></div>${body}</div>`;
 };
 
 PP.view_calendar = () => {
@@ -143,6 +159,13 @@ PP.bindView = () => {
   document.querySelectorAll('[data-job]').forEach(x=>x.onclick=e=>{if(e.target.closest('[data-jobtype]'))return;PP.openJob(x.dataset.job)});
   document.querySelectorAll('[data-jobtype]').forEach(x=>x.onchange=e=>{e.stopPropagation();let j=PP.state.jobs.find(j=>j.id===x.dataset.jobtype);if(!j)return;j.jobType=x.value;if(x.value==='Stock / Internal')j.productionClass='patv';j.events=j.events||[];j.events.push({time:new Date().toISOString(),text:'Flag / type changed to '+x.value,by:PP.profile.display_name});PP.save();PP.render()});
   document.querySelectorAll('[data-list]').forEach(x=>x.onclick=()=>{PP.list=x.dataset.list;PP.render()});
+  document.querySelectorAll('[data-schedule-mode]').forEach(x=>x.onclick=()=>{PP.scheduleMode=x.dataset.scheduleMode;PP.render()});
+  document.querySelectorAll('[data-stage-drag]').forEach(x=>x.addEventListener('dragstart',e=>{e.dataTransfer.setData('text/plain',x.dataset.stageDrag);e.dataTransfer.effectAllowed='move'}));
+  document.querySelectorAll('[data-stage-drop]').forEach(x=>{
+    x.addEventListener('dragover',e=>{e.preventDefault();x.classList.add('dragover')});
+    x.addEventListener('dragleave',()=>x.classList.remove('dragover'));
+    x.addEventListener('drop',e=>{e.preventDefault();x.classList.remove('dragover');let id=e.dataTransfer.getData('text/plain'),j=PP.state.jobs.find(j=>j.id===id);if(!j)return;let old=j.stage,next=x.dataset.stageDrop;if(old===next)return;j.stage=next;j.stageEnteredAt=new Date().toISOString();j.awaitingApproval=false;j.pendingNext='';j.events=j.events||[];j.events.push({time:new Date().toISOString(),text:'Stage changed: '+old+' → '+next,by:PP.profile.display_name});PP.save();PP.render()});
+  });
   document.querySelectorAll('[data-cal-class]').forEach(x=>x.onclick=()=>{PP.calendarClass=x.dataset.calClass;PP.render()});
   document.querySelector('[data-cal-prev]')?.addEventListener('click',()=>{PP.calendarOffset=(PP.calendarOffset||0)-1;PP.render()});
   document.querySelector('[data-cal-next]')?.addEventListener('click',()=>{PP.calendarOffset=(PP.calendarOffset||0)+1;PP.render()});
