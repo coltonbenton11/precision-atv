@@ -187,9 +187,69 @@ PP.view_machinist = () => {
   return `<div class="card"><div class="card-head"><div><h2>Dedicated machinist schedule</h2><p>Machine work is separate from the customer calendar.</p></div></div><div class="machine-list">${runs.length ? runs.map(r=>{const f=PP.FAMILIES.find(x=>x.id===r.familyId);return `<div class="machine-run ${r.status==='In Progress'?'live':''}"><b>${r.date}</b><div><strong>${f?.label}</strong><br><span class="muted">${r.component} · ${r.qty} sets</span></div><span>${r.status}</span><div><button class="btn" data-run-start="${r.id}">Start</button> <button class="btn primary" data-run-done="${r.id}">Complete</button></div></div>`}).join('') : '<div class="empty">No machine runs scheduled.</div>'}</div></div>`;
 };
 
+PP.twilioRequest = async (method='GET', payload) => {
+  const { data } = await PP.sb.auth.getSession();
+  const token = data?.session?.access_token;
+  if (!token) throw new Error('Sign in again before testing SMS.');
+  const options = {
+    method,
+    headers: { authorization: 'Bearer ' + token, 'content-type': 'application/json' },
+    cache: 'no-store'
+  };
+  if (payload) options.body = JSON.stringify(payload);
+  const response = await fetch('/api/twilio-test', options);
+  const text = await response.text();
+  let result = {};
+  try { result = text ? JSON.parse(text) : {}; } catch { result = { error: text }; }
+  if (!response.ok) throw new Error(result?.error || ('Twilio request failed (' + response.status + ')'));
+  return result;
+};
+
+PP.checkTwilio = async () => {
+  const state = document.querySelector('#twilioState');
+  const result = document.querySelector('#twilioResult');
+  if (!state) return;
+  try {
+    const data = await PP.twilioRequest('GET');
+    state.textContent = data.configured ? 'Configured' : 'Needs setup';
+    state.className = 'badge ' + (data.configured ? 'green' : 'amber');
+    if (result && !data.configured) result.textContent = 'Twilio variables are missing from this Production deployment.';
+  } catch (err) {
+    state.textContent = 'Unavailable';
+    state.className = 'badge red';
+    if (result) result.textContent = err?.message || 'Could not check Twilio.';
+  }
+};
+
+PP.sendTwilioTest = async () => {
+  const input = document.querySelector('#twilioPhone');
+  const button = document.querySelector('[data-twilio-test]');
+  const result = document.querySelector('#twilioResult');
+  const to = String(input?.value || '').trim();
+  if (!to) {
+    if (result) result.textContent = 'Enter a phone number first.';
+    input?.focus();
+    return;
+  }
+  if (button) button.disabled = true;
+  if (result) result.textContent = 'Sending test text...';
+  try {
+    const data = await PP.twilioRequest('POST', { to });
+    if (result) result.textContent = 'Sent successfully. Twilio status: ' + (data.status || 'queued');
+    PP.toast('Twilio test text sent');
+  } catch (err) {
+    if (result) result.textContent = err?.message || 'Test failed.';
+    PP.toast(err?.message || 'Twilio test failed');
+  } finally {
+    if (button) button.disabled = false;
+  }
+};
+
 PP.view_notifications = () => {
   const s = PP.state.notificationSettings, out = PP.state.emailOutbox;
-  return `<div class="toolbar"><label>Stale after <input class="num" id="staleDays" type="number" value="${s.staleDays}"> days</label><button class="btn" data-scan-email>Check stale jobs</button></div><div class="card"><div class="card-head"><div><h2>Email outbox</h2><p>Delivery provider is not connected yet; messages are queued here safely.</p></div></div>${out.length ? out.map(e=>{const j=PP.state.jobs.find(x=>x.id===e.jobId);return `<div class="email-row ${e.status==='Needs Review'?'review':''}"><b>${j?.invoice||''}</b><div><strong>${PP.esc(e.subject)}</strong><p>${PP.esc(e.body)}</p></div><span>${e.status}</span><button class="btn" data-email-cancel="${e.id}">Cancel</button></div>`}).join('') : '<div class="empty">Outbox is clear.</div>'}</div>`;
+  return `<div class="toolbar"><label>Stale after <input class="num" id="staleDays" type="number" value="${s.staleDays}"> days</label><button class="btn" data-scan-email>Check stale jobs</button></div>
+  <div class="card"><div class="card-head"><div><h2>Twilio SMS Test</h2><p>Use this to confirm the Precision Production app can send SMS before we automate stage updates.</p></div><span id="twilioState" class="badge">Checking...</span></div><div class="actions"><input id="twilioPhone" type="tel" placeholder="+19365551234" style="min-width:240px"><button class="btn primary" data-twilio-test>Send test text</button></div><p id="twilioResult" class="muted">Enter your cell number with +1 and send one test message.</p></div>
+  <div class="card"><div class="card-head"><div><h2>Email outbox</h2><p>Delivery provider is not connected yet; messages are queued here safely.</p></div></div>${out.length ? out.map(e=>{const j=PP.state.jobs.find(x=>x.id===e.jobId);return `<div class="email-row ${e.status==='Needs Review'?'review':''}"><b>${j?.invoice||''}</b><div><strong>${PP.esc(e.subject)}</strong><p>${PP.esc(e.body)}</p></div><span>${e.status}</span><button class="btn" data-email-cancel="${e.id}">Cancel</button></div>`}).join('') : '<div class="empty">Outbox is clear.</div>'}</div>`;
 };
 PP.view_mywork = () => PP.jobTable(PP.state.jobs.filter(j=>j.stage!=='Complete'&&j.assigned===PP.profile.display_name));
 PP.view_blocked = () => PP.jobTable(PP.state.jobs.filter(j=>j.blocked&&j.stage!=='Complete'));
@@ -231,6 +291,8 @@ PP.bindView = () => {
   document.querySelectorAll('[data-run-start]').forEach(x=>x.onclick=()=>PP.runStart(x.dataset.runStart));
   document.querySelectorAll('[data-run-done]').forEach(x=>x.onclick=()=>PP.runDone(x.dataset.runDone));
   document.querySelector('[data-scan-email]')?.addEventListener('click',PP.scanStale);
+  document.querySelector('[data-twilio-test]')?.addEventListener('click',PP.sendTwilioTest);
+  if (document.querySelector('#twilioState')) PP.checkTwilio();
   document.querySelectorAll('[data-email-cancel]').forEach(x=>x.onclick=()=>{PP.state.emailOutbox=PP.state.emailOutbox.filter(e=>e.id!==x.dataset.emailCancel);PP.save();PP.render()});
   document.querySelectorAll('[data-team-save]').forEach(x=>x.onclick=()=>PP.saveMember(x.dataset.teamSave));
   document.querySelector('#staleDays')?.addEventListener('change',e=>{PP.state.notificationSettings.staleDays=Number(e.target.value)||3;PP.save()});
