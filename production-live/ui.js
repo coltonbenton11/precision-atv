@@ -246,9 +246,17 @@ PP.sendTwilioTest = async () => {
 };
 
 PP.view_notifications = () => {
-  const s = PP.state.notificationSettings, out = PP.state.emailOutbox;
-  return `<div class="toolbar"><label>Stale after <input class="num" id="staleDays" type="number" value="${s.staleDays}"> days</label><button class="btn" data-scan-email>Check stale jobs</button></div>
-  <div class="card"><div class="card-head"><div><h2>Twilio SMS Test</h2><p>Use this to confirm the Precision Production app can send SMS before we automate stage updates.</p></div><span id="twilioState" class="badge">Checking...</span></div><div class="actions"><input id="twilioPhone" type="tel" placeholder="+19365551234" style="min-width:240px"><button class="btn primary" data-twilio-test>Send test text</button></div><p id="twilioResult" class="muted">Enter your cell number with +1 and send one test message.</p></div>
+  const s = PP.state.notificationSettings || {}, out = PP.state.emailOutbox || [], sms = [...(PP.state.smsLog||[])].reverse().slice(0,40);
+  const stageChecks=(PP.SMS_STAGES||[]).map(stage=>`<label style="display:flex;gap:7px;align-items:center"><input type="checkbox" data-sms-stage="${PP.esc(stage)}" ${(s.smsStages||[]).includes(stage)?'checked':''} style="width:auto"> ${PP.esc(stage)}</label>`).join('');
+  return `<div class="toolbar"><label>Stale after <input class="num" id="staleDays" type="number" value="${s.staleDays||3}"> days</label><button class="btn" data-scan-email>Check stale jobs</button></div>
+  <div class="card"><div class="card-head"><div><h2>Twilio SMS Test</h2><p>Confirms the Production app can reach Twilio.</p></div><span id="twilioState" class="badge">Checking...</span></div><div class="actions"><input id="twilioPhone" type="tel" placeholder="+19365551234" style="min-width:240px"><button class="btn primary" data-twilio-test>Send test text</button></div><p id="twilioResult" class="muted">Trial accounts use Twilio's approved test template. Customer stage texts use the Precision ATV message after the Twilio account is eligible for custom business SMS.</p></div>
+  <div class="card"><div class="card-head"><div><h2>Automatic Stage Texts</h2><p>Only customer jobs with a saved phone number and recorded SMS consent can be texted.</p></div><label style="display:flex;gap:8px;align-items:center"><input id="smsAuto" type="checkbox" ${s.smsAuto?'checked':''} style="width:auto"> Enabled</label></div>
+    <div style="display:flex;gap:14px;flex-wrap:wrap">${stageChecks}</div>
+    <p class="muted" style="margin-top:12px">Default milestones: Machining, Waiting for Parts, Ready to Build, Test, Ready for Ship, and Complete. A stage is sent only once per job after a successful delivery request.</p>
+  </div>
+  <div class="card"><div class="card-head"><div><h2>Text Message Log</h2><p>Automatic and manual customer text attempts from Production.</p></div><span class="badge">${sms.length}</span></div>
+    ${sms.length?sms.map(x=>{const j=PP.state.jobs.find(j=>j.id===x.jobId);return `<div class="email-row ${x.status==='Failed'?'review':''}"><b>${PP.esc(x.invoice||j?.invoice||'')}</b><div><strong>${PP.esc(x.customer||j?.customer||'Customer')} · ${PP.esc(x.stage||'Manual')}</strong><p>${PP.esc(x.body||'')}</p><small class="muted">${PP.esc(x.phone||'')} · ${new Date(x.sentAt||x.createdAt).toLocaleString()}${x.error?' · '+PP.esc(x.error):''}</small></div><span>${PP.esc(x.status)}</span><span class="muted">${PP.esc(x.source||'')}</span></div>`}).join(''):'<div class="empty">No customer texts have been sent yet.</div>'}
+  </div>
   <div class="card"><div class="card-head"><div><h2>Email outbox</h2><p>Delivery provider is not connected yet; messages are queued here safely.</p></div></div>${out.length ? out.map(e=>{const j=PP.state.jobs.find(x=>x.id===e.jobId);return `<div class="email-row ${e.status==='Needs Review'?'review':''}"><b>${j?.invoice||''}</b><div><strong>${PP.esc(e.subject)}</strong><p>${PP.esc(e.body)}</p></div><span>${e.status}</span><button class="btn" data-email-cancel="${e.id}">Cancel</button></div>`}).join('') : '<div class="empty">Outbox is clear.</div>'}</div>`;
 };
 PP.view_mywork = () => PP.jobTable(PP.state.jobs.filter(j=>j.stage!=='Complete'&&j.assigned===PP.profile.display_name));
@@ -269,7 +277,7 @@ PP.bindView = () => {
   document.querySelectorAll('[data-stage-drop]').forEach(x=>{
     x.addEventListener('dragover',e=>{e.preventDefault();x.classList.add('dragover')});
     x.addEventListener('dragleave',()=>x.classList.remove('dragover'));
-    x.addEventListener('drop',e=>{e.preventDefault();x.classList.remove('dragover');let id=e.dataTransfer.getData('text/plain'),j=PP.state.jobs.find(j=>j.id===id);if(!j)return;let old=j.stage,next=x.dataset.stageDrop;if(old===next)return;j.stage=next;j.stageEnteredAt=new Date().toISOString();j.awaitingApproval=false;j.pendingNext='';j.events=j.events||[];j.events.push({time:new Date().toISOString(),text:'Stage changed: '+old+' → '+next,by:PP.profile.display_name});PP.save();PP.render()});
+    x.addEventListener('drop',e=>{e.preventDefault();x.classList.remove('dragover');let id=e.dataTransfer.getData('text/plain'),j=PP.state.jobs.find(j=>j.id===id);if(!j)return;let old=j.stage,next=x.dataset.stageDrop;if(old===next)return;j.stage=next;j.stageEnteredAt=new Date().toISOString();j.awaitingApproval=false;j.pendingNext='';j.events=j.events||[];j.events.push({time:new Date().toISOString(),text:'Stage changed: '+old+' → '+next,by:PP.profile.display_name});PP.stageNotify?.(j,old,next);PP.save();PP.render()});
   });
   {const board=document.querySelector('[data-stage-board]'),bar=document.querySelector('[data-stage-scrollbar]');if(board&&bar){let lock=false;board.addEventListener('scroll',()=>{if(lock)return;lock=true;bar.scrollLeft=board.scrollLeft;requestAnimationFrame(()=>lock=false)});bar.addEventListener('scroll',()=>{if(lock)return;lock=true;board.scrollLeft=bar.scrollLeft;requestAnimationFrame(()=>lock=false)})}}
   document.querySelectorAll('[data-cal-class]').forEach(x=>x.onclick=()=>{PP.calendarClass=x.dataset.calClass;PP.render()});
@@ -293,6 +301,8 @@ PP.bindView = () => {
   document.querySelector('[data-scan-email]')?.addEventListener('click',PP.scanStale);
   document.querySelector('[data-twilio-test]')?.addEventListener('click',PP.sendTwilioTest);
   if (document.querySelector('#twilioState')) PP.checkTwilio();
+  document.querySelector('#smsAuto')?.addEventListener('change',e=>{PP.state.notificationSettings.smsAuto=!!e.target.checked;PP.save();PP.toast(e.target.checked?'Automatic stage texts enabled':'Automatic stage texts disabled')});
+  document.querySelectorAll('[data-sms-stage]').forEach(x=>x.addEventListener('change',()=>{let stage=x.dataset.smsStage,list=new Set(PP.state.notificationSettings.smsStages||[]);x.checked?list.add(stage):list.delete(stage);PP.state.notificationSettings.smsStages=[...list];PP.save()}));
   document.querySelectorAll('[data-email-cancel]').forEach(x=>x.onclick=()=>{PP.state.emailOutbox=PP.state.emailOutbox.filter(e=>e.id!==x.dataset.emailCancel);PP.save();PP.render()});
   document.querySelectorAll('[data-team-save]').forEach(x=>x.onclick=()=>PP.saveMember(x.dataset.teamSave));
   document.querySelector('#staleDays')?.addEventListener('change',e=>{PP.state.notificationSettings.staleDays=Number(e.target.value)||3;PP.save()});
