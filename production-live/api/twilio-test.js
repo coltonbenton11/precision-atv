@@ -104,10 +104,29 @@ export default async function handler(req, res) {
     const params = new URLSearchParams();
     params.set('To', to);
     params.set('From', twilio.fromNumber);
-    // Twilio trial accounts only accept one of Twilio's predefined SMS template names.
-    // Once the account is upgraded, we can switch this back to a custom Precision ATV message.
-    const trialTemplate = String(process.env.TWILIO_TRIAL_TEMPLATE || 'sms_delivery_updates').trim();
-    params.set('Body', trialTemplate);
+
+    const mode = String(body?.mode || 'test');
+    const requestedMessage = String(body?.message || '').trim();
+
+    if (mode === 'customer') {
+      if (body?.consent !== true) {
+        res.status(400).json({ error: 'Customer SMS consent is required before sending.' });
+        return;
+      }
+      if (!requestedMessage) {
+        res.status(400).json({ error: 'Customer message is empty.' });
+        return;
+      }
+      if (requestedMessage.length > 600) {
+        res.status(400).json({ error: 'Customer SMS must be 600 characters or fewer.' });
+        return;
+      }
+      params.set('Body', requestedMessage);
+    } else {
+      // Trial connectivity test only. Twilio trial accounts require an approved template name.
+      const trialTemplate = String(process.env.TWILIO_TRIAL_TEMPLATE || 'sms_delivery_updates').trim();
+      params.set('Body', trialTemplate);
+    }
 
     const auth = Buffer.from(twilio.accountSid + ':' + twilio.authToken).toString('base64');
     const response = await fetch(
@@ -127,8 +146,12 @@ export default async function handler(req, res) {
     try { data = text ? JSON.parse(text) : {}; } catch { data = { message: text }; }
 
     if (!response.ok) {
+      let message = data?.message || 'Twilio rejected the SMS.';
+      if (mode === 'customer' && /trial accounts can only use predefined sms templates/i.test(message)) {
+        message = 'Twilio trial mode cannot send custom customer updates yet. Upgrade the Twilio account, then this automatic stage text will work without code changes.';
+      }
       res.status(response.status >= 400 && response.status < 500 ? response.status : 502).json({
-        error: data?.message || 'Twilio rejected the test message.',
+        error: message,
         code: data?.code || null,
       });
       return;
