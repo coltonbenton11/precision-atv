@@ -66,21 +66,57 @@ export default async function handler(req,res){
   const rawDomain=process.env.SHOPIFY_STORE_DOMAIN||'';
   const domain=rawDomain.replace(/^https?:\/\//,'').replace(/\/$/,'');
   const token=process.env.SHOPIFY_STOREFRONT_TOKEN||process.env.SHOPIFY_STOREFRONT_ACCESS_TOKEN||process.env.SHOPIFY_STOREFRONT_PUBLIC_ACCESS_TOKEN;
-  const first=Math.min(Number(req.query.first||100),100);
-  if(!domain||!token)return res.status(200).json({mode:'preview',warning:'Shopify Storefront credentials are not available to this deployment.',products:FALLBACK.slice(0,first)});
-  const query=`query Products($first:Int!){products(first:$first,sortKey:BEST_SELLING){nodes{id handle title productType vendor featuredImage{url altText} images(first:1){nodes{url altText}} media(first:1){nodes{previewImage{url altText}}} variants(first:10){nodes{id title availableForSale price{amount currencyCode}}}}}}`;
+  const wantAll=String(req.query.all||'')==='1'||String(req.query.all||'').toLowerCase()==='true';
+  const requested=Math.max(1,Number(req.query.first||100)||100);
+  const first=Math.min(requested,100);
+
+  if(!domain||!token){
+    const products=wantAll?FALLBACK:FALLBACK.slice(0,first);
+    return res.status(200).json({mode:'preview',warning:'Shopify Storefront credentials are not available to this deployment.',products,total:products.length,hasMore:false});
+  }
+
+  const query=`query Products($first:Int!,$after:String){products(first:$first,after:$after,sortKey:BEST_SELLING){pageInfo{hasNextPage endCursor}nodes{id handle title productType vendor tags featuredImage{url altText} images(first:1){nodes{url altText}} media(first:1){nodes{previewImage{url altText}}} variants(first:10){nodes{id title availableForSale price{amount currencyCode}}}}}}`;
+
   try{
-    const r=await fetch(`https://${domain}/api/${API_VERSION}/graphql.json`,{method:'POST',headers:{'content-type':'application/json','X-Shopify-Storefront-Access-Token':token},body:JSON.stringify({query,variables:{first}})});
-    const j=await r.json();
-    if(!r.ok||j.errors)throw new Error(j.errors?.[0]?.message||`Shopify returned HTTP ${r.status}`);
-    const products=(j.data?.products?.nodes||[]).map(p=>{
-      const v=p.variants?.nodes?.find(x=>x.availableForSale)||p.variants?.nodes?.[0];
-      const image=p.featuredImage?.url||p.images?.nodes?.[0]?.url||p.media?.nodes?.[0]?.previewImage?.url||fallbackImage(p.title);
-      return{id:p.id,handle:p.handle,title:p.title,productType:p.productType,vendor:p.vendor,image,variantId:v?.id||null,price:v?.price?.amount||0,currency:v?.price?.currencyCode||'USD',available:!!v?.availableForSale};
-    });
+    const products=[];
+    let after=null;
+    let hasMore=true;
+    const maxProducts=wantAll?1200:first;
+
+    while(hasMore&&products.length<maxProducts){
+      const pageSize=Math.min(100,maxProducts-products.length);
+      const r=await fetch(`https://${domain}/api/${API_VERSION}/graphql.json`,{
+        method:'POST',
+        headers:{'content-type':'application/json','X-Shopify-Storefront-Access-Token':token},
+        body:JSON.stringify({query,variables:{first:pageSize,after}})
+      });
+      const j=await r.json();
+      if(!r.ok||j.errors)throw new Error(j.errors?.[0]?.message||`Shopify returned HTTP ${r.status}`);
+      const connection=j.data?.products;
+      const nodes=connection?.nodes||[];
+
+      for(const p of nodes){
+        const v=p.variants?.nodes?.find(x=>x.availableForSale)||p.variants?.nodes?.[0];
+        const image=p.featuredImage?.url||p.images?.nodes?.[0]?.url||p.media?.nodes?.[0]?.previewImage?.url||fallbackImage(p.title);
+        const tags=Array.isArray(p.tags)?p.tags:[];
+        products.push({
+          id:p.id,handle:p.handle,title:p.title,productType:p.productType,vendor:p.vendor,tags,image,
+          variantId:v?.id||null,price:v?.price?.amount||0,currency:v?.price?.currencyCode||'USD',
+          available:!!v?.availableForSale,
+          searchText:[p.title,p.productType,p.vendor,...tags].filter(Boolean).join(' ').toLowerCase()
+        });
+      }
+
+      hasMore=Boolean(connection?.pageInfo?.hasNextPage);
+      after=connection?.pageInfo?.endCursor||null;
+      if(!nodes.length||!after)hasMore=false;
+      if(!wantAll)hasMore=false;
+    }
+
     res.setHeader('Cache-Control','public, s-maxage=60, stale-while-revalidate=300');
-    return res.status(200).json({mode:'shopify',products});
+    return res.status(200).json({mode:'shopify',products,total:products.length,hasMore});
   }catch(e){
-    return res.status(200).json({mode:'preview',warning:e.message,products:FALLBACK.slice(0,first)});
+    const products=wantAll?FALLBACK:FALLBACK.slice(0,first);
+    return res.status(200).json({mode:'preview',warning:e.message,products,total:products.length,hasMore:false});
   }
 }
