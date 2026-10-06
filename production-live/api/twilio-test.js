@@ -53,7 +53,7 @@ async function bodyJson(req) {
   try { return JSON.parse(Buffer.concat(chunks).toString('utf8')); } catch { return {}; }
 }
 
-module.exports = async function handler(req, res) {
+export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
 
   const token = bearer(req);
@@ -82,9 +82,11 @@ module.exports = async function handler(req, res) {
   }
 
   const body = await bodyJson(req);
-  const to = String(body?.to || '').replace(/[\s().-]/g, '');
+  let to = String(body?.to || '').replace(/[^\d+]/g, '');
+  if (/^\d{10}$/.test(to)) to = '+1' + to;
+  else if (/^1\d{10}$/.test(to)) to = '+' + to;
   if (!/^\+[1-9]\d{7,14}$/.test(to)) {
-    res.status(400).json({ error: 'Enter the number with country code, for example +19365551234.' });
+    res.status(400).json({ error: 'Enter a valid phone number. A 10-digit US number is accepted.' });
     return;
   }
 
