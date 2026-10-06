@@ -10,6 +10,17 @@ PP.sortedJobs = (cls) => PP.state.jobs
 PP.badge = (j) => j.jobType === 'Warranty'
   ? '<span class="badge red">WARRANTY</span>'
   : j.blocked ? '<span class="badge amber">BLOCKED</span>' : '<span class="badge green">READY</span>';
+PP.latestUpdate = (j) => {
+  const list=Array.isArray(j.updates)?j.updates:[];
+  return list.length?list[list.length-1]:null;
+};
+PP.latestUpdateCell = (j) => {
+  const u=PP.latestUpdate(j);
+  if(!u)return '<span class="muted">—</span>';
+  const text=String(u.text||'');
+  const short=text.length>80?text.slice(0,77)+'…':text;
+  return `<span title="${PP.esc(text)}">${PP.esc(short)}</span><br><small class="muted">${PP.esc(u.by||'Team')} · ${new Date(u.time).toLocaleDateString()}</small>`;
+};
 
 PP.render = () => {
   if (!PP.state) return;
@@ -29,10 +40,11 @@ PP.render = () => {
 PP.jobTable = (jobs) => {
   if (!jobs.length) return '<div class="empty">No jobs here.</div>';
   const canFlag = ['owner','manager'].includes(PP.profile.role);
-  return `<div class="table-wrap"><table><thead><tr><th>Invoice</th><th>Customer</th><th>ClickUp tag</th><th>ClickUp Status</th><th>Flag / Type</th><th>Engine</th><th>Stage</th><th>Planned</th><th>Status</th></tr></thead><tbody>${jobs.map(j => `
+  return `<div class="table-wrap"><table><thead><tr><th>Invoice</th><th>Customer</th><th>Latest update</th><th>ClickUp tag</th><th>ClickUp Status</th><th>Flag / Type</th><th>Engine</th><th>Stage</th><th>Planned</th><th>Status</th></tr></thead><tbody>${jobs.map(j => `
     <tr class="click" data-job="${j.id}">
       <td class="inv">${PP.esc(j.invoice)}</td>
       <td>${PP.esc(j.customer)}</td>
+      <td>${PP.latestUpdateCell(j)}</td>
       <td>${(j.sourceTags||[]).length ? (j.sourceTags||[]).map(t=>`<span class="badge">${PP.esc(t)}</span>`).join(' ') : '<span class="muted">—</span>'}</td>
       <td>${j.sourceStatus ? `<span class="badge">${PP.esc(j.sourceStatus)}</span>` : '<span class="muted">—</span>'}</td>
       <td>${canFlag ? `<select class="type-inline" data-jobtype="${j.id}">${PP.TYPES.map(t=>`<option ${t===j.jobType?'selected':''}>${PP.esc(t)}</option>`).join('')}</select>` : PP.esc(j.jobType)}</td>
@@ -70,7 +82,8 @@ PP.view_schedule = () => {
     if (!q) return true;
     const hay = [
       j.invoice,j.invoiceNumber,j.customer,j.engine,j.stage,j.jobType,j.sourceStatus,
-      j.plannedDate,j.orderDate,j.blockerType,j.blockerNote,...(j.sourceTags||[])
+      j.plannedDate,j.orderDate,j.blockerType,j.blockerNote,j.notes,
+      ...(j.sourceTags||[]),...(j.updates||[]).map(u=>u.text)
     ].join(' ').toLowerCase();
     return hay.includes(q);
   });
