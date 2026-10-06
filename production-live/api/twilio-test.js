@@ -104,7 +104,10 @@ export default async function handler(req, res) {
     const params = new URLSearchParams();
     params.set('To', to);
     params.set('From', twilio.fromNumber);
-    params.set('Body', 'Precision ATV Production test: Twilio SMS is connected and working.');
+    // Twilio trial accounts only accept one of Twilio's predefined SMS template names.
+    // Once the account is upgraded, we can switch this back to a custom Precision ATV message.
+    const trialTemplate = String(process.env.TWILIO_TRIAL_TEMPLATE || 'sms_delivery_updates').trim();
+    params.set('Body', trialTemplate);
 
     const auth = Buffer.from(twilio.accountSid + ':' + twilio.authToken).toString('base64');
     const response = await fetch(
