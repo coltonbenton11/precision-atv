@@ -56,46 +56,56 @@ async function bodyJson(req) {
 export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
 
-  const token = bearer(req);
-  if (!(await verifyManager(token))) {
-    res.status(403).json({ error: 'Manager or owner access required.' });
-    return;
-  }
-
-  const twilio = config();
-  const method = String(req.method || 'GET').toUpperCase();
-
-  if (method === 'GET') {
-    res.status(200).json({ configured: twilio.configured });
-    return;
-  }
-
-  if (method !== 'POST') {
-    res.setHeader('Allow', 'GET, POST');
-    res.status(405).json({ error: 'Method not allowed.' });
-    return;
-  }
-
-  if (!twilio.configured) {
-    res.status(503).json({ error: 'Twilio environment variables are not configured for this deployment.' });
-    return;
-  }
-
-  const body = await bodyJson(req);
-  let to = String(body?.to || '').replace(/[^\d+]/g, '');
-  if (/^\d{10}$/.test(to)) to = '+1' + to;
-  else if (/^1\d{10}$/.test(to)) to = '+' + to;
-  if (!/^\+[1-9]\d{7,14}$/.test(to)) {
-    res.status(400).json({ error: 'Enter a valid phone number. A 10-digit US number is accepted.' });
-    return;
-  }
-
-  const params = new URLSearchParams();
-  params.set('To', to);
-  params.set('From', twilio.fromNumber);
-  params.set('Body', 'Precision ATV Production test: Twilio SMS is connected and working.');
-
   try {
+    const twilio = config();
+    const method = String(req.method || 'GET').toUpperCase();
+
+    // Safe health check: only reports whether required variables exist.
+    // This keeps the UI diagnostic independent of Supabase auth/networking.
+    if (method === 'GET') {
+      res.status(200).json({ configured: twilio.configured });
+      return;
+    }
+
+    if (method !== 'POST') {
+      res.setHeader('Allow', 'GET, POST');
+      res.status(405).json({ error: 'Method not allowed.' });
+      return;
+    }
+
+    let allowed = false;
+    try {
+      allowed = await verifyManager(bearer(req));
+    } catch (error) {
+      console.error('Supabase manager verification failed', error);
+      res.status(502).json({ error: 'Could not verify Production access. Please sign out and back in, then retry.' });
+      return;
+    }
+
+    if (!allowed) {
+      res.status(403).json({ error: 'Manager or owner access required.' });
+      return;
+    }
+
+    if (!twilio.configured) {
+      res.status(503).json({ error: 'Twilio environment variables are not configured for this Production deployment.' });
+      return;
+    }
+
+    const body = await bodyJson(req);
+    let to = String(body?.to || '').replace(/[^\d+]/g, '');
+    if (/^\d{10}$/.test(to)) to = '+1' + to;
+    else if (/^1\d{10}$/.test(to)) to = '+' + to;
+    if (!/^\+[1-9]\d{7,14}$/.test(to)) {
+      res.status(400).json({ error: 'Enter a valid phone number. A 10-digit US number is accepted.' });
+      return;
+    }
+
+    const params = new URLSearchParams();
+    params.set('To', to);
+    params.set('From', twilio.fromNumber);
+    params.set('Body', 'Precision ATV Production test: Twilio SMS is connected and working.');
+
     const auth = Buffer.from(twilio.accountSid + ':' + twilio.authToken).toString('base64');
     const response = await fetch(
       'https://api.twilio.com/2010-04-01/Accounts/' + encodeURIComponent(twilio.accountSid) + '/Messages.json',
@@ -127,7 +137,10 @@ export default async function handler(req, res) {
       status: data?.status || 'queued',
     });
   } catch (error) {
-    console.error('Twilio test failed', error);
-    res.status(502).json({ error: 'Could not reach Twilio.' });
+    console.error('Precision Production Twilio endpoint failed', error);
+    res.status(500).json({
+      error: 'Twilio endpoint error.',
+      detail: error instanceof Error ? error.message : String(error),
+    });
   }
-};
+}
