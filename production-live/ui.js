@@ -175,22 +175,79 @@ PP.invPlan = (r) => {
   return {...p, scheduled, projected, make};
 };
 
-PP.inflowRequest = async (method='GET', payload) => {
-  const { data } = await PP.sb.auth.getSession();
-  const token = data?.session?.access_token;
-  if (!token) throw new Error('Sign in again before using inFlow.');
-  const options = {
-    method,
-    headers: { authorization: 'Bearer ' + token, 'content-type': 'application/json' },
-    cache: 'no-store'
-  };
-  if (payload) options.body = JSON.stringify(payload);
-  const response = await fetch('/api/inflow-inventory', options);
-  const text = await response.text();
-  let result = {};
-  try { result = text ? JSON.parse(text) : {}; } catch { result = { error:text }; }
-  if (!response.ok) throw new Error(result?.error || ('inFlow request failed (' + response.status + ')'));
-  return result;
+PP.parseCsv = text => {
+  const rows=[];let row=[],cell='',quoted=false;
+  text=String(text||'').replace(/^\uFEFF/,'');
+  for(let i=0;i<text.length;i++){
+    const ch=text[i],next=text[i+1];
+    if(ch==='"'){
+      if(quoted&&next==='"'){cell+='"';i++}
+      else quoted=!quoted;
+    }else if(ch===','&&!quoted){row.push(cell);cell=''}
+    else if((ch==='\n'||ch==='\r')&&!quoted){
+      if(ch==='\r'&&next==='\n')i++;
+      row.push(cell);cell='';
+      if(row.some(v=>String(v).trim()!==''))rows.push(row);
+      row=[];
+    }else cell+=ch;
+  }
+  if(cell!==''||row.length){row.push(cell);if(row.some(v=>String(v).trim()!==''))rows.push(row)}
+  if(!rows.length)return [];
+  const headers=rows[0].map(h=>String(h).trim());
+  return rows.slice(1).map(values=>Object.fromEntries(headers.map((h,i)=>[h,String(values[i]??'').trim()])));
+};
+
+PP.importInflowCsv = async file => {
+  if(!file)return;
+  const detail=document.querySelector('#inflowDetail');
+  try{
+    const text=await file.text();
+    const rows=PP.parseCsv(text);
+    const required=['ProductName','SKU','Location','Sublocation','Quantity'];
+    const headers=rows.length?Object.keys(rows[0]):[];
+    const missing=required.filter(h=>!headers.includes(h));
+    if(missing.length)throw new Error('This does not look like the inFlow Stock Levels CSV. Missing: '+missing.join(', '));
+
+    const grouped=new Map();
+    let negativeRows=0,totalUnits=0;
+    for(const r of rows){
+      const name=String(r.ProductName||'').trim();
+      const sku=String(r.SKU||'').trim();
+      if(!name&&!sku)continue;
+      const qty=Number(String(r.Quantity||'0').replace(/,/g,''));
+      const quantity=Number.isFinite(qty)?qty:0;
+      if(quantity<0)negativeRows++;
+      totalUnits+=quantity;
+      const key=sku?'sku:'+sku.toLowerCase():'name:'+name.toLowerCase();
+      if(!grouped.has(key))grouped.set(key,{
+        productId:key,name,sku,onHand:0,available:0,onOrder:null,locations:[]
+      });
+      const p=grouped.get(key);
+      p.onHand+=quantity;p.available+=quantity;
+      const location=String(r.Location||'').trim();
+      const sublocation=String(r.Sublocation||'').trim();
+      const lk=(location+'|'+sublocation).toLowerCase();
+      let loc=p.locations.find(x=>x.key===lk);
+      if(!loc){loc={key:lk,location,sublocation,quantity:0};p.locations.push(loc)}
+      loc.quantity+=quantity;
+    }
+    const products=[...grouped.values()].sort((a,b)=>(a.sku||a.name).localeCompare(b.sku||b.name));
+    PP.state.inflowInventory={
+      products,
+      pulledAt:new Date().toISOString(),
+      sourceFile:file.name||'inFlow Stock Levels CSV',
+      sourceRows:rows.length,
+      negativeRows,
+      totals:{onHand:totalUnits,available:totalUnits,onOrder:null}
+    };
+    PP.applyInflowMappings();
+    PP.save();
+    PP.toast('Imported '+products.length+' inFlow products from '+rows.length+' stock rows');
+    PP.render();
+  }catch(err){
+    if(detail)detail.textContent=err?.message||'Could not import the CSV.';
+    PP.toast(err?.message||'Could not import inFlow CSV');
+  }
 };
 
 PP.applyInflowMappings = () => {
@@ -202,7 +259,6 @@ PP.applyInflowMappings = () => {
     const product = products.find(p => p.productId === productId);
     if (!product) return;
     row.onHand = Number(product.onHand || 0);
-    row.onOrder = Number(product.onOrder || 0);
     row.inflowAvailable = Number(product.available ?? product.onHand ?? 0);
     row.inflowProductId = product.productId;
     row.inflowSku = product.sku || '';
@@ -211,51 +267,9 @@ PP.applyInflowMappings = () => {
   });
 };
 
-PP.pullInflowInventory = async () => {
-  const button=document.querySelector('[data-inflow-pull]');
-  const status=document.querySelector('#inflowStatus');
-  if(button)button.disabled=true;
-  if(status)status.textContent='Pulling…';
-  try{
-    const result=await PP.inflowRequest('POST',{action:'pull'});
-    PP.state.inflowInventory={
-      products:result.products||[],
-      pulledAt:result.pulledAt||new Date().toISOString(),
-      totals:result.totals||{onHand:0,available:0,onOrder:0}
-    };
-    PP.applyInflowMappings();
-    PP.save();
-    PP.toast('Pulled '+(result.count||0)+' products from inFlow');
-    PP.render();
-  }catch(err){
-    PP.toast(err?.message||'inFlow pull failed');
-    if(status)status.textContent='Needs setup';
-    const detail=document.querySelector('#inflowDetail');
-    if(detail)detail.textContent=err?.message||'Could not reach inFlow.';
-  }finally{
-    if(button)button.disabled=false;
-  }
-};
-
-PP.checkInflowStatus = async () => {
-  const status=document.querySelector('#inflowStatus');
-  const detail=document.querySelector('#inflowDetail');
-  if(!status)return;
-  try{
-    const result=await PP.inflowRequest('GET');
-    status.textContent=result.configured?'Connected':'Needs API setup';
-    status.className='badge '+(result.configured?'green':'amber');
-    if(!result.configured&&detail)detail.textContent='Add INFLOW_COMPANY_ID and INFLOW_API_KEY to the Precision Production Vercel project.';
-  }catch(err){
-    status.textContent='Unavailable';
-    status.className='badge red';
-    if(detail)detail.textContent=err?.message||'Could not check inFlow.';
-  }
-};
-
 PP.view_materials = () => {
   const flags = PP.state.inventory.filter(r=>PP.invPlan(r).make>0).length;
-  const inflow=PP.state.inflowInventory||{products:[],totals:{onHand:0,available:0,onOrder:0}};
+  const inflow=PP.state.inflowInventory||{products:[],totals:{onHand:0,available:0,onOrder:null}};
   const products=inflow.products||[];
   const mappings=PP.state.inflowMappings||{};
   const q=String(PP.inflowSearch||'').trim().toLowerCase();
@@ -272,17 +286,20 @@ PP.view_materials = () => {
   </div>
 
   <div class="card">
-    <div class="card-head"><div><h2>inFlow Inventory</h2><p>inFlow is the inventory source. Pulling refreshes on-hand / incoming values for every linked production item.</p></div><div class="actions"><span id="inflowStatus" class="badge">Checking…</span><button class="btn primary" data-inflow-pull>Pull from inFlow</button></div></div>
-    <p id="inflowDetail" class="muted">Last pull: ${PP.esc(last)} · On hand: ${Number(inflow.totals?.onHand||0)} · Available: ${Number(inflow.totals?.available||0)} · On order: ${Number(inflow.totals?.onOrder||0)}</p>
-    <div class="production-tools" style="margin-top:12px"><label class="production-search"><span>Search inFlow</span><input type="search" data-inflow-search value="${PP.esc(PP.inflowSearch||'')}" placeholder="SKU or product name"></label></div>
-    <div class="table-wrap"><table><thead><tr><th>SKU</th><th>Product</th><th>On hand</th><th>Available</th><th>On order</th><th>Locations</th></tr></thead><tbody>
-      ${shown.length?shown.map(p=>`<tr><td>${PP.esc(p.sku||'—')}</td><td><b>${PP.esc(p.name||'Unnamed')}</b></td><td>${Number(p.onHand||0)}</td><td>${Number(p.available||0)}</td><td>${Number(p.onOrder||0)}</td><td>${(p.locations||[]).length}</td></tr>`).join(''):'<tr><td colspan="6" class="muted">No inFlow inventory pulled yet.</td></tr>'}
+    <div class="card-head">
+      <div><h2>inFlow Stock Levels Import</h2><p>Export Stock Levels from inFlow and import the CSV here. No API subscription is required.</p></div>
+      <div class="actions"><label class="btn primary" for="inflowCsvFile">Import inFlow CSV</label><input id="inflowCsvFile" data-inflow-file type="file" accept=".csv,text/csv" hidden></div>
+    </div>
+    <p id="inflowDetail" class="muted">Last import: ${PP.esc(last)}${inflow.sourceFile?' · '+PP.esc(inflow.sourceFile):''}${inflow.sourceRows?' · '+Number(inflow.sourceRows)+' stock rows':''} · Total quantity: ${Number(inflow.totals?.onHand||0)}${inflow.negativeRows?' · '+Number(inflow.negativeRows)+' negative stock row(s)':''}</p>
+    <div class="production-tools" style="margin-top:12px"><label class="production-search"><span>Search imported stock</span><input type="search" data-inflow-search value="${PP.esc(PP.inflowSearch||'')}" placeholder="SKU or product name"></label></div>
+    <div class="table-wrap"><table><thead><tr><th>SKU</th><th>Product</th><th>Quantity</th><th>Location / bins</th></tr></thead><tbody>
+      ${shown.length?shown.map(p=>`<tr><td>${PP.esc(p.sku||'—')}</td><td><b>${PP.esc(p.name||'Unnamed')}</b></td><td>${Number(p.onHand||0)}</td><td>${(p.locations||[]).length}</td></tr>`).join(''):'<tr><td colspan="4" class="muted">Import an inFlow Stock Levels CSV to load inventory.</td></tr>'}
     </tbody></table></div>
   </div>
 
   <div class="card"><div class="card-head"><div><h2>Queue demand</h2><p>Enter a planned queue when you know more engines are coming than are entered individually.</p></div></div><div class="table-wrap"><table><thead><tr><th>Family</th><th>2025 units</th><th>Active</th><th>Planned queue</th><th>Plan for</th></tr></thead><tbody>${PP.FAMILIES.map(f=>{const p=PP.plan(f);return `<tr><td>${f.label}</td><td>${f.hist}</td><td>${p.active}</td><td><input class="queue-edit" data-q="${f.id}" type="number" min="0" value="${p.override||''}" placeholder="${p.active}"></td><td><b>${p.plan}</b></td></tr>`}).join('')}</tbody></table></div></div>
 
-  <div class="card"><div class="card-head"><div><h2>Inventory → machining trigger</h2><p>Link each production row to its matching inFlow SKU once. Future pulls will update Ready and Incoming automatically.</p></div><button class="btn primary" data-schedule-all>Schedule all flagged</button></div><div class="table-wrap"><table><thead><tr><th>Family</th><th>Component</th><th>inFlow product</th><th>Ready</th><th>Available</th><th>Incoming</th><th>Buffer</th><th>Projected</th><th>Action</th></tr></thead><tbody>${PP.state.inventory.map(r=>{const f=PP.FAMILIES.find(x=>x.id===r.familyId);const p=PP.invPlan(r);return `<tr><td>${f.label}</td><td>${r.component}</td><td><select data-inflow-map="${r.id}" style="min-width:240px">${productOptions(mappings[r.id]||'')}</select></td><td><b>${r.onHand}</b></td><td>${r.inflowAvailable==null?'—':r.inflowAvailable}</td><td><b>${r.onOrder}</b></td><td><input class="num" data-inv="${r.id}" data-field="reorderPoint" type="number" value="${r.reorderPoint}"></td><td class="${p.projected<r.reorderPoint?'negative':''}">${p.projected}</td><td>${p.make?`<button class="btn" data-machine="${r.id}">Machine ${p.make}</button>`:'<span class="badge green">Covered</span>'}</td></tr>`}).join('')}</tbody></table></div></div>`;
+  <div class="card"><div class="card-head"><div><h2>Inventory → machining trigger</h2><p>Link each production row to its matching inFlow SKU once. Every future CSV import will refresh Ready automatically. Incoming stays manual because the Stock Levels export does not include purchase-order quantities.</p></div><button class="btn primary" data-schedule-all>Schedule all flagged</button></div><div class="table-wrap"><table><thead><tr><th>Family</th><th>Component</th><th>inFlow product</th><th>Ready</th><th>Available</th><th>Incoming (manual)</th><th>Buffer</th><th>Projected</th><th>Action</th></tr></thead><tbody>${PP.state.inventory.map(r=>{const f=PP.FAMILIES.find(x=>x.id===r.familyId);const p=PP.invPlan(r);return `<tr><td>${f.label}</td><td>${r.component}</td><td><select data-inflow-map="${r.id}" style="min-width:240px">${productOptions(mappings[r.id]||'')}</select></td><td><b>${r.onHand}</b></td><td>${r.inflowAvailable==null?'—':r.inflowAvailable}</td><td><input class="num" data-inv="${r.id}" data-field="onOrder" type="number" value="${r.onOrder||0}"></td><td><input class="num" data-inv="${r.id}" data-field="reorderPoint" type="number" value="${r.reorderPoint}"></td><td class="${p.projected<r.reorderPoint?'negative':''}">${p.projected}</td><td>${p.make?`<button class="btn" data-machine="${r.id}">Machine ${p.make}</button>`:'<span class="badge green">Covered</span>'}</td></tr>`}).join('')}</tbody></table></div></div>`;
 };
 
 PP.view_machinist = () => {
@@ -397,8 +414,7 @@ PP.bindView = () => {
   document.querySelector('[data-drop-unscheduled]')?.addEventListener('drop',e=>{e.preventDefault();let id=e.dataTransfer.getData('text/plain'),j=PP.state.jobs.find(j=>j.id===id);if(!j)return;j.plannedDate='';j.events=j.events||[];j.events.push({time:new Date().toISOString(),text:'Removed from production calendar',by:PP.profile.display_name});PP.save();PP.render()});
   document.querySelectorAll('[data-q]').forEach(x=>x.onchange=()=>{PP.state.queueOverrides[x.dataset.q]=Number(x.value)||0;PP.save();PP.render()});
   document.querySelectorAll('[data-inv]').forEach(x=>x.onchange=()=>{const r=PP.state.inventory.find(i=>i.id===x.dataset.inv);r[x.dataset.field]=Number(x.value)||0;PP.save();PP.render()});
-  document.querySelector('[data-inflow-pull]')?.addEventListener('click',PP.pullInflowInventory);
-  if(document.querySelector('#inflowStatus'))PP.checkInflowStatus();
+  document.querySelector('[data-inflow-file]')?.addEventListener('change',e=>{const file=e.target.files?.[0];if(file)PP.importInflowCsv(file)});
   document.querySelector('[data-inflow-search]')?.addEventListener('input',e=>{PP.inflowSearch=e.target.value;const pos=e.target.selectionStart;PP.render();requestAnimationFrame(()=>{const n=document.querySelector('[data-inflow-search]');if(n){n.focus();try{n.setSelectionRange(pos,pos)}catch(_){}}})});
   document.querySelectorAll('[data-inflow-map]').forEach(x=>x.addEventListener('change',()=>{PP.state.inflowMappings[x.dataset.inflowMap]=x.value||'';PP.applyInflowMappings();PP.save();PP.render();PP.toast(x.value?'inFlow item linked':'inFlow link removed')}));
   document.querySelector('[data-schedule-all]')?.addEventListener('click',PP.scheduleAll);
