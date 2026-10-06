@@ -267,8 +267,53 @@ PP.applyInflowMappings = () => {
   });
 };
 
+PP.stockFlag = r => {
+  const p=PP.invPlan(r);
+  const linked=Boolean((PP.state.inflowMappings||{})[r.id]);
+  const supply=Number(r.onHand||0)+Number(r.onOrder||0)+Number(p.scheduled||0);
+  const activeNeed=Number(p.active||0);
+  const safety=Number(r.reorderPoint||0);
+  let level='covered',label='Covered',rank=0;
+  if(!linked){level='unmapped';label='Needs mapping';rank=4}
+  else if(supply<activeNeed||p.projected<0){level='critical';label='Critical';rank=3}
+  else if(p.projected<safety){level='low';label='Low';rank=2}
+  else if(p.projected===safety){level='watch';label='Watch';rank=1}
+  return {...p,supply,safety,linked,level,label,rank,make:Math.max(0,Math.ceil(safety-p.projected))};
+};
+
+PP.modelProjection = f => {
+  const rows=PP.state.inventory.filter(r=>r.familyId===f.id).map(r=>({row:r,flag:PP.stockFlag(r)}));
+  const active=PP.state.jobs.filter(j=>j.stage!=='Complete'&&j.productionClass==='customer'&&PP.classify(j.engine)===f.id).length;
+  const horizon=Number(PP.state.forecastHorizon||60);
+  const forecast30=Math.ceil(Number(f.hist||0)/365*30);
+  const forecast60=Math.ceil(Number(f.hist||0)/365*60);
+  const forecast90=Math.ceil(Number(f.hist||0)/365*90);
+  const horizonForecast=Math.ceil(Number(f.hist||0)/365*horizon);
+  const demand=Math.max(active,horizonForecast);
+  const linkedRows=rows.filter(x=>x.flag.linked);
+  const worst=linkedRows.length?[...linkedRows].sort((a,b)=>b.flag.rank-a.flag.rank)[0].flag:null;
+  const ready=linkedRows.length?Math.min(...linkedRows.map(x=>Number(x.row.onHand||0))):null;
+  const incoming=linkedRows.length?Math.min(...linkedRows.map(x=>Number(x.row.onOrder||0)+Number(x.flag.scheduled||0))):null;
+  const projected=linkedRows.length?Math.min(...linkedRows.map(x=>Number(x.flag.projected||0))):null;
+  const make=linkedRows.length?Math.max(...linkedRows.map(x=>Number(x.flag.make||0))):0;
+  const daily=Number(f.hist||0)/365;
+  const totalSupply=linkedRows.length?Math.min(...linkedRows.map(x=>Number(x.row.onHand||0)+Number(x.row.onOrder||0)+Number(x.flag.scheduled||0))):null;
+  const daysCover=linkedRows.length&&daily>0?Math.max(0,Math.floor((totalSupply-active)/daily)):null;
+  return {f,active,forecast30,forecast60,forecast90,horizonForecast,demand,worst,ready,incoming,projected,make,daysCover};
+};
+
+PP.flagBadge = flag => {
+  if(!flag)return '<span class="badge">Needs mapping</span>';
+  const cls=flag.level==='critical'?'red':(flag.level==='low'||flag.level==='watch'?'amber':(flag.level==='covered'?'green':''));
+  return `<span class="badge ${cls}">${PP.esc(flag.label)}</span>`;
+};
+
 PP.view_materials = () => {
-  const flags = PP.state.inventory.filter(r=>PP.invPlan(r).make>0).length;
+  const rowFlags=PP.state.inventory.map(r=>PP.stockFlag(r));
+  const flags=rowFlags.filter(x=>x.linked&&x.make>0).length;
+  const critical=rowFlags.filter(x=>x.level==='critical').length;
+  const low=rowFlags.filter(x=>x.level==='low'||x.level==='watch').length;
+  const projections=PP.FAMILIES.map(f=>PP.modelProjection(f));
   const inflow=PP.state.inflowInventory||{products:[],totals:{onHand:0,available:0,onOrder:null}};
   const products=inflow.products||[];
   const mappings=PP.state.inflowMappings||{};
@@ -278,11 +323,26 @@ PP.view_materials = () => {
   const productOptions=(selected)=>['<option value="">Not linked</option>',...products.map(p=>`<option value="${PP.esc(p.productId)}" ${p.productId===selected?'selected':''}>${PP.esc((p.sku?p.sku+' — ':'')+p.name)}</option>`)].join('');
 
   return `<div class="summary">
-    <div class="stat"><span>2025 mapped demand</span><strong>46</strong></div>
-    <div class="stat"><span>Forecast horizon</span><strong>${PP.state.forecastHorizon}d</strong></div>
+    <div class="stat"><span>Critical components</span><strong>${critical}</strong></div>
+    <div class="stat"><span>Low / watch</span><strong>${low}</strong></div>
     <div class="stat"><span>Machine flags</span><strong>${flags}</strong></div>
     <div class="stat"><span>Runs scheduled</span><strong>${PP.state.machineRuns.filter(r=>r.status!=='Complete').length}</strong></div>
     <div class="stat"><span>inFlow products</span><strong>${products.length}</strong></div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <div><h2>Model Stock Projection</h2><p>Compares live jobs, historical model usage, current inFlow stock, incoming parts, scheduled machining, and your safety buffer.</p></div>
+      <label>Projection <select data-forecast-horizon>
+        <option value="30" ${Number(PP.state.forecastHorizon||60)===30?'selected':''}>30 days</option>
+        <option value="60" ${Number(PP.state.forecastHorizon||60)===60?'selected':''}>60 days</option>
+        <option value="90" ${Number(PP.state.forecastHorizon||60)===90?'selected':''}>90 days</option>
+      </select></label>
+    </div>
+    <div class="table-wrap"><table><thead><tr><th>Model</th><th>Active jobs</th><th>30d</th><th>60d</th><th>90d</th><th>Plan for</th><th>Ready</th><th>Incoming + machining</th><th>Projected</th><th>Days cover</th><th>Flag</th><th>Make</th></tr></thead><tbody>
+      ${projections.map(x=>`<tr><td><b>${PP.esc(x.f.label)}</b></td><td>${x.active}</td><td>${x.forecast30}</td><td>${x.forecast60}</td><td>${x.forecast90}</td><td><b>${x.demand}</b></td><td>${x.ready==null?'—':x.ready}</td><td>${x.incoming==null?'—':x.incoming}</td><td class="${x.projected!=null&&x.projected<0?'negative':''}">${x.projected==null?'—':x.projected}</td><td>${x.daysCover==null?'—':x.daysCover+'d'}</td><td>${PP.flagBadge(x.worst)}</td><td>${x.make>0?'<b>'+x.make+'</b>':'—'}</td></tr>`).join('')}
+    </tbody></table></div>
+    <p class="muted" style="margin-top:12px"><b>Critical</b> = supply cannot cover active/forecast demand. <b>Low</b> = demand is covered but projected stock falls below the safety buffer. <b>Covered</b> = projected stock remains at or above the buffer.</p>
   </div>
 
   <div class="card">
@@ -299,7 +359,7 @@ PP.view_materials = () => {
 
   <div class="card"><div class="card-head"><div><h2>Queue demand</h2><p>Enter a planned queue when you know more engines are coming than are entered individually.</p></div></div><div class="table-wrap"><table><thead><tr><th>Family</th><th>2025 units</th><th>Active</th><th>Planned queue</th><th>Plan for</th></tr></thead><tbody>${PP.FAMILIES.map(f=>{const p=PP.plan(f);return `<tr><td>${f.label}</td><td>${f.hist}</td><td>${p.active}</td><td><input class="queue-edit" data-q="${f.id}" type="number" min="0" value="${p.override||''}" placeholder="${p.active}"></td><td><b>${p.plan}</b></td></tr>`}).join('')}</tbody></table></div></div>
 
-  <div class="card"><div class="card-head"><div><h2>Inventory → machining trigger</h2><p>Link each production row to its matching inFlow SKU once. Every future CSV import will refresh Ready automatically. Incoming stays manual because the Stock Levels export does not include purchase-order quantities.</p></div><button class="btn primary" data-schedule-all>Schedule all flagged</button></div><div class="table-wrap"><table><thead><tr><th>Family</th><th>Component</th><th>inFlow product</th><th>Ready</th><th>Available</th><th>Incoming (manual)</th><th>Buffer</th><th>Projected</th><th>Action</th></tr></thead><tbody>${PP.state.inventory.map(r=>{const f=PP.FAMILIES.find(x=>x.id===r.familyId);const p=PP.invPlan(r);return `<tr><td>${f.label}</td><td>${r.component}</td><td><select data-inflow-map="${r.id}" style="min-width:240px">${productOptions(mappings[r.id]||'')}</select></td><td><b>${r.onHand}</b></td><td>${r.inflowAvailable==null?'—':r.inflowAvailable}</td><td><input class="num" data-inv="${r.id}" data-field="onOrder" type="number" value="${r.onOrder||0}"></td><td><input class="num" data-inv="${r.id}" data-field="reorderPoint" type="number" value="${r.reorderPoint}"></td><td class="${p.projected<r.reorderPoint?'negative':''}">${p.projected}</td><td>${p.make?`<button class="btn" data-machine="${r.id}">Machine ${p.make}</button>`:'<span class="badge green">Covered</span>'}</td></tr>`}).join('')}</tbody></table></div></div>`;
+  <div class="card"><div class="card-head"><div><h2>Inventory → machining trigger</h2><p>Link each production row to its matching inFlow SKU once. Every future CSV import refreshes Ready automatically. Incoming stays manual because the Stock Levels export does not include purchase-order quantities.</p></div><button class="btn primary" data-schedule-all>Schedule all flagged</button></div><div class="table-wrap"><table><thead><tr><th>Family</th><th>Component</th><th>inFlow product</th><th>Ready</th><th>Incoming</th><th>Scheduled</th><th>Demand</th><th>Buffer</th><th>Projected</th><th>Flag</th><th>Action</th></tr></thead><tbody>${PP.state.inventory.map(r=>{const f=PP.FAMILIES.find(x=>x.id===r.familyId);const p=PP.stockFlag(r);return `<tr><td>${f.label}</td><td>${r.component}</td><td><select data-inflow-map="${r.id}" style="min-width:240px">${productOptions(mappings[r.id]||'')}</select></td><td><b>${r.onHand}</b></td><td><input class="num" data-inv="${r.id}" data-field="onOrder" type="number" value="${r.onOrder||0}"></td><td>${p.scheduled||0}</td><td>${p.plan}</td><td><input class="num" data-inv="${r.id}" data-field="reorderPoint" type="number" value="${r.reorderPoint}"></td><td class="${p.projected<r.reorderPoint?'negative':''}">${p.projected}</td><td>${PP.flagBadge(p)}</td><td>${p.make?`<button class="btn" data-machine="${r.id}">Machine ${p.make}</button>`:'<span class="badge green">Covered</span>'}</td></tr>`).join('')}</tbody></table></div></div>`;
 };
 
 PP.view_machinist = () => {
@@ -417,6 +477,7 @@ PP.bindView = () => {
   document.querySelector('[data-inflow-file]')?.addEventListener('change',e=>{const file=e.target.files?.[0];if(file)PP.importInflowCsv(file)});
   document.querySelector('[data-inflow-search]')?.addEventListener('input',e=>{PP.inflowSearch=e.target.value;const pos=e.target.selectionStart;PP.render();requestAnimationFrame(()=>{const n=document.querySelector('[data-inflow-search]');if(n){n.focus();try{n.setSelectionRange(pos,pos)}catch(_){}}})});
   document.querySelectorAll('[data-inflow-map]').forEach(x=>x.addEventListener('change',()=>{PP.state.inflowMappings[x.dataset.inflowMap]=x.value||'';PP.applyInflowMappings();PP.save();PP.render();PP.toast(x.value?'inFlow item linked':'inFlow link removed')}));
+  document.querySelector('[data-forecast-horizon]')?.addEventListener('change',e=>{PP.state.forecastHorizon=Number(e.target.value)||60;PP.save();PP.render();PP.toast('Projection updated to '+PP.state.forecastHorizon+' days')});
   document.querySelector('[data-schedule-all]')?.addEventListener('click',PP.scheduleAll);
   document.querySelectorAll('[data-machine]').forEach(x=>x.onclick=()=>PP.scheduleRun(x.dataset.machine));
   document.querySelectorAll('[data-run-start]').forEach(x=>x.onclick=()=>PP.runStart(x.dataset.runStart));
