@@ -267,13 +267,26 @@ PP.applyInflowMappings = () => {
   });
 };
 
+// Update only the imported-stock results during typing. Never rebuild the entire page.
+PP.inflowRowsHtml = (products, term) => {
+  const q = String(term || '').trim().toLowerCase();
+  const rows = [];
+  for (const p of products) {
+    if (q && !(String(p.sku || '') + ' ' + String(p.name || '')).toLowerCase().includes(q)) continue;
+    rows.push(`<tr><td>${PP.esc(p.sku||'—')}</td><td><b>${PP.esc(p.name||'Unnamed')}</b></td><td>${Number(p.onHand||0)}</td><td>${(p.locations||[]).length}</td></tr>`);
+    if (rows.length >= 150) break;
+  }
+  if (rows.length) return rows.join('');
+  return '<tr><td colspan="4" class="muted">' +
+    (products.length ? 'No matching inventory items.' : 'Import an inFlow Stock Levels CSV to load inventory.') +
+    '</td></tr>';
+};
+
 PP.view_materials = () => {
   const flags = PP.state.inventory.filter(r=>PP.invPlan(r).make>0).length;
   const inflow=PP.state.inflowInventory||{products:[],totals:{onHand:0,available:0,onOrder:null}};
   const products=inflow.products||[];
   const mappings=PP.state.inflowMappings||{};
-  const q=String(PP.inflowSearch||'').trim().toLowerCase();
-  const shown=products.filter(p=>!q||[p.sku,p.name].join(' ').toLowerCase().includes(q)).slice(0,150);
   const last=inflow.pulledAt?new Date(inflow.pulledAt).toLocaleString():'Never';
   const productOptions=(selected)=>['<option value="">Not linked</option>',...products.map(p=>`<option value="${PP.esc(p.productId)}" ${p.productId===selected?'selected':''}>${PP.esc((p.sku?p.sku+' — ':'')+p.name)}</option>`)].join('');
 
@@ -292,8 +305,8 @@ PP.view_materials = () => {
     </div>
     <p id="inflowDetail" class="muted">Last import: ${PP.esc(last)}${inflow.sourceFile?' · '+PP.esc(inflow.sourceFile):''}${inflow.sourceRows?' · '+Number(inflow.sourceRows)+' stock rows':''} · Total quantity: ${Number(inflow.totals?.onHand||0)}${inflow.negativeRows?' · '+Number(inflow.negativeRows)+' negative stock row(s)':''}</p>
     <div class="production-tools" style="margin-top:12px"><label class="production-search"><span>Search imported stock</span><input type="search" data-inflow-search value="${PP.esc(PP.inflowSearch||'')}" placeholder="SKU or product name"></label></div>
-    <div class="table-wrap"><table><thead><tr><th>SKU</th><th>Product</th><th>Quantity</th><th>Location / bins</th></tr></thead><tbody>
-      ${shown.length?shown.map(p=>`<tr><td>${PP.esc(p.sku||'—')}</td><td><b>${PP.esc(p.name||'Unnamed')}</b></td><td>${Number(p.onHand||0)}</td><td>${(p.locations||[]).length}</td></tr>`).join(''):'<tr><td colspan="4" class="muted">Import an inFlow Stock Levels CSV to load inventory.</td></tr>'}
+    <div class="table-wrap"><table><thead><tr><th>SKU</th><th>Product</th><th>Quantity</th><th>Location / bins</th></tr></thead><tbody data-inflow-results>
+      ${PP.inflowRowsHtml(products,PP.inflowSearch)}
     </tbody></table></div>
   </div>
 
@@ -415,7 +428,14 @@ PP.bindView = () => {
   document.querySelectorAll('[data-q]').forEach(x=>x.onchange=()=>{PP.state.queueOverrides[x.dataset.q]=Number(x.value)||0;PP.save();PP.render()});
   document.querySelectorAll('[data-inv]').forEach(x=>x.onchange=()=>{const r=PP.state.inventory.find(i=>i.id===x.dataset.inv);r[x.dataset.field]=Number(x.value)||0;PP.save();PP.render()});
   document.querySelector('[data-inflow-file]')?.addEventListener('change',e=>{const file=e.target.files?.[0];if(file)PP.importInflowCsv(file)});
-  document.querySelector('[data-inflow-search]')?.addEventListener('input',e=>{PP.inflowSearch=e.target.value;const pos=e.target.selectionStart;PP.render();requestAnimationFrame(()=>{const n=document.querySelector('[data-inflow-search]');if(n){n.focus();try{n.setSelectionRange(pos,pos)}catch(_){}}})});
+  document.querySelector('[data-inflow-search]')?.addEventListener('input',e=>{
+    PP.inflowSearch = e.target.value;
+    clearTimeout(PP.inflowSearchTimer);
+    PP.inflowSearchTimer = setTimeout(() => {
+      const results = document.querySelector('[data-inflow-results]');
+      if (results) results.innerHTML = PP.inflowRowsHtml(PP.state.inflowInventory?.products || [], PP.inflowSearch);
+    }, 180);
+  });
   document.querySelectorAll('[data-inflow-map]').forEach(x=>x.addEventListener('change',()=>{PP.state.inflowMappings[x.dataset.inflowMap]=x.value||'';PP.applyInflowMappings();PP.save();PP.render();PP.toast(x.value?'inFlow item linked':'inFlow link removed')}));
   document.querySelector('[data-schedule-all]')?.addEventListener('click',PP.scheduleAll);
   document.querySelectorAll('[data-machine]').forEach(x=>x.onclick=()=>PP.scheduleRun(x.dataset.machine));
