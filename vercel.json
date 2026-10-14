@@ -168,6 +168,81 @@
       "source": "/policies/shipping-policy",
       "destination": "https://precisionatv-com.myshopify.com/policies/shipping-policy",
       "permanent": false
+    },
+    {
+      "source": "/products/2020-canam-defender-1000-long-block-fully-remanufactured",
+      "destination": "/products/2017-2026-can-am-defender-hd10-remanufactured-engine",
+      "permanent": true
+    },
+    {
+      "source": "/products/2016-2024-canam-defender-hd10-engine-copy",
+      "destination": "/products/2016-2021-can-am-defender-hd8-remanufactured-engine",
+      "permanent": true
+    },
+    {
+      "source": "/products/2016-2021-canam-defender-hd8-engine-copy",
+      "destination": "/products/2012-2024-can-am-outlander-1000-remanufactured-engine",
+      "permanent": true
+    },
+    {
+      "source": "/products/2012-2023-canam-outlander-1000-engine-copy",
+      "destination": "/products/2012-2015-can-am-outlander-800-remanufactured-engine",
+      "permanent": true
+    },
+    {
+      "source": "/products/2012-2015-canam-outlander-800-engine",
+      "destination": "/products/2012-2015-can-am-renegade-800-remanufactured-engine",
+      "permanent": true
+    },
+    {
+      "source": "/products/2016-2021-canam-defender-hd8-engine-copy-1",
+      "destination": "/products/2022-2026-can-am-defender-hd9-remanufactured-engine",
+      "permanent": true
+    },
+    {
+      "source": "/products/2016-2021-canam-defender-hd8-engine",
+      "destination": "/products/2022-2026-can-am-defender-hd7-remanufactured-engine",
+      "permanent": true
+    },
+    {
+      "source": "/products/2018-2021-canam-defender-hd5-engine-copy-1",
+      "destination": "/products/2018-2021-can-am-defender-hd5-remanufactured-engine",
+      "permanent": true
+    },
+    {
+      "source": "/products/2016-2021-canam-defender-hd8-engine-copy-3",
+      "destination": "/products/2013-2019-polaris-ranger-xp-900-remanufactured-engine",
+      "permanent": true
+    },
+    {
+      "source": "/products/2013-2018-polaris-ranger-xp-900-remanufactored-engine-copy",
+      "destination": "/products/2017-2025-polaris-ranger-xp-1000-remanufactured-engine",
+      "permanent": true
+    },
+    {
+      "source": "/products/2017-2024-polaris-ranger-xp-1000-remanufactored-engine-copy",
+      "destination": "/products/2014-2026-polaris-rzr-xp-1000-remanufactured-engine",
+      "permanent": true
+    },
+    {
+      "source": "/products/2016-2017-polaris-rzr-s-1000-remanufactored-engine",
+      "destination": "/products/2016-2022-polaris-rzr-s-1000-remanufactured-engine",
+      "permanent": true
+    },
+    {
+      "source": "/products/2020-2025-polaris-ranger-1000-sohc-remanufactured-engine-oem-spec-1-year-warranty",
+      "destination": "/products/2015-2016-polaris-ranger-xp-570-remanufactured-engine",
+      "permanent": true
+    },
+    {
+      "source": "/products/polaris-sportsman-2009-2026-850-remanufactured-rebuilt-engine-oem-spec-1-year-warranty-copy",
+      "destination": "/products/2015-2026-polaris-sportsman-1000-remanufactured-engine",
+      "permanent": true
+    },
+    {
+      "source": "/products/17-present-can-am-maverick-x3-remanufactured-engine",
+      "destination": "/products/2017-2026-can-am-maverick-x3-remanufactured-engine",
+      "permanent": true
     }
   ],
   "rewrites": [
@@ -182,6 +257,18 @@
     {
       "source": "/sitemap.xml",
       "destination": "/api/sitemap"
+    },
+    {
+      "source": "/engines/polaris",
+      "destination": "/api/seo-landing?section=polaris"
+    },
+    {
+      "source": "/engines/can-am",
+      "destination": "/api/seo-landing?section=can-am"
+    },
+    {
+      "source": "/rebuild-kits-parts",
+      "destination": "/api/seo-landing?section=parts"
     }
   ]
 }
