@@ -1,3 +1,4 @@
+import { namuraFitment } from './_namuraFitment.js';
 const API_VERSION='2026-07';
 const SHOP='https://precisionatv-com.myshopify.com/cdn/shop/files/';
 
@@ -99,11 +100,12 @@ export default async function handler(req,res){
         const v=p.variants?.nodes?.find(x=>x.availableForSale)||p.variants?.nodes?.[0];
         const image=p.featuredImage?.url||p.images?.nodes?.[0]?.url||p.media?.nodes?.[0]?.previewImage?.url||fallbackImage(p.title);
         const tags=Array.isArray(p.tags)?p.tags:[];
+        const namura=namuraFitment(p.title);
         products.push({
           id:p.id,handle:p.handle,title:p.title,productType:p.productType,vendor:p.vendor,tags,image,
           variantId:v?.id||null,price:v?.price?.amount||0,currency:v?.price?.currencyCode||'USD',
           available:!!v?.availableForSale,
-          searchText:[p.title,p.productType,p.vendor,...tags].filter(Boolean).join(' ').toLowerCase()
+          searchText:[p.title,p.productType,p.vendor,...tags,namura?.part,namura?.models,namura?.spec].filter(Boolean).join(' ').toLowerCase()
         });
       }
 
