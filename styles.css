@@ -39,3 +39,10 @@
 .catalog-more{display:flex;justify-content:center;margin-top:28px}
 @media(max-width:1000px){.engine-finder{grid-template-columns:1fr}.engine-finder-fields{grid-template-columns:1fr 1fr}.engine-model{grid-column:1/-1}.engine-finder-actions{grid-column:1/-1}}
 @media(max-width:560px){.engine-finder{padding:18px}.engine-finder-fields{grid-template-columns:1fr}.engine-model,.engine-finder-actions{grid-column:auto}.engine-finder-actions{flex-direction:column}.engine-finder-actions .btn{width:100%}.catalog-meta{display:block}.catalog-meta span{display:block;margin-bottom:4px}}
+
+/* Crawlable shop categories: Polaris engines, Can-Am engines, and rebuild kits & parts */
+.shop-category-links{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:18px 0 24px}
+.shop-category-links a{display:inline-flex;align-items:center;border:1px solid #363b46;border-radius:999px;background:#16191f;color:#f4f6f8;padding:10px 15px;text-decoration:none;font-size:14px;font-weight:700}
+.shop-category-links a:hover,.shop-category-links a:focus-visible{border-color:var(--accent);color:var(--accent)}
+.seo-category-bar{padding:16px 0 8px;border-bottom:1px solid var(--line)}
+.seo-category-bar .shop-category-links{margin:12px 0}
