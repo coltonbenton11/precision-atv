@@ -25,7 +25,16 @@ export default async function handler(req,res){
   if(!variantId)return res.status(400).json({error:'Missing variant'});
   if(!/^[A-HJ-NPR-Z0-9]{17}$/.test(vin))return res.status(400).json({error:'A valid 17-character VIN is required before checkout.'});
 
-  const query=`mutation CartCreate($input:CartInput!){cartCreate(input:$input){cart{id checkoutUrl} userErrors{field message}}}`;
+  const query=`mutation CartCreate($input:CartInput!){
+    cartCreate(input:$input){
+      cart{
+        id checkoutUrl buyerIdentity{countryCode}
+        lines(first:10){nodes{quantity merchandise{... on ProductVariant{id availableForSale}}}}
+      }
+      userErrors{code field message}
+      warnings{code message target}
+    }
+  }`;
 
   try{
     const shopify=await fetch(`https://${domain}/api/${API_VERSION}/graphql.json`,{
@@ -43,12 +52,48 @@ export default async function handler(req,res){
       return res.status(502).json({error:'Shopify returned an invalid checkout response'});
     }
 
-    const error=data.data?.cartCreate?.userErrors?.[0]?.message||data.errors?.[0]?.message;
-    if(!shopify.ok||error)return res.status(400).json({error:error||`Shopify returned HTTP ${shopify.status}`});
+    const result=data.data?.cartCreate;
+    const apiError=result?.userErrors?.[0]||data.errors?.[0];
+    if(!shopify.ok||apiError){
+      console.warn('Shopify cart creation rejected',{variantId,quantity,status:shopify.status,code:apiError?.code,message:apiError?.message});
+      return res.status(400).json({
+        error:apiError?.message||`Shopify checkout returned HTTP ${shopify.status}`,
+        code:apiError?.code||'SHOPIFY_CART_ERROR'
+      });
+    }
 
-    const checkoutUrl=data.data?.cartCreate?.cart?.checkoutUrl;
-    if(!checkoutUrl)return res.status(502).json({error:'Shopify did not return a checkout URL'});
+    // Shopify can return a checkout URL while excluding unavailable merchandise.
+    // Verify that the requested variant and exact quantity survived cart creation.
+    const cart=result?.cart;
+    if(!cart)return res.status(502).json({error:'Shopify did not return a cart. Please try again.',code:'MISSING_CART'});
 
+    const warnings=result?.warnings||[];
+    const stockOrMarketWarning=warnings.find(w=>
+      ['MERCHANDISE_OUT_OF_STOCK','MERCHANDISE_NOT_ENOUGH_STOCK','PRODUCT_UNAVAILABLE_IN_BUYER_LOCATION'].includes(w.code)
+    );
+    const lines=cart.lines?.nodes||[];
+    const matching=lines.filter(line=>line.merchandise?.id===variantId);
+    const validCart=lines.length===1&&matching.length===1&&
+      matching[0].quantity===quantity&&matching[0].merchandise.availableForSale===true;
+
+    if(stockOrMarketWarning||!validCart){
+      console.warn('Shopify checkout line validation failed',{
+        variantId,quantity,country:cart.buyerIdentity?.countryCode,
+        returnedLines:lines.map(line=>({variantId:line.merchandise?.id,quantity:line.quantity,available:line.merchandise?.availableForSale})),
+        warnings:warnings.map(w=>({code:w.code,message:w.message,target:w.target}))
+      });
+      const message=stockOrMarketWarning?.message||
+        'Shopify did not add the selected engine and core-charge option to your cart.';
+      return res.status(409).json({
+        error:`${message} Please contact the shop so we can check this option before you pay.`,
+        code:stockOrMarketWarning?.code||'CART_LINE_MISMATCH'
+      });
+    }
+
+    const checkoutUrl=cart.checkoutUrl;
+    if(!checkoutUrl)return res.status(502).json({error:'Shopify did not return a checkout URL',code:'MISSING_CHECKOUT_URL'});
+
+    res.setHeader('Cache-Control','no-store');
     return res.status(200).json({checkoutUrl});
   }catch(e){
     console.error('Shopify cartCreate failed',e);
