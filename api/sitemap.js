@@ -7,6 +7,9 @@ export default async function handler(req,res){
  const staticUrls=[
   {loc:BASE+'/',priority:'1.0',changefreq:'weekly'},
   {loc:BASE+'/shop',priority:'0.9',changefreq:'daily'},
+  {loc:BASE+'/engines/polaris',priority:'0.9',changefreq:'weekly'},
+  {loc:BASE+'/engines/can-am',priority:'0.9',changefreq:'weekly'},
+  {loc:BASE+'/rebuild-kits-parts',priority:'0.9',changefreq:'weekly'},
   {loc:BASE+'/services',priority:'0.9',changefreq:'monthly'},
   {loc:BASE+'/about',priority:'0.7',changefreq:'monthly'},
   {loc:BASE+'/contact',priority:'0.7',changefreq:'monthly'}
