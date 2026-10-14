@@ -88,7 +88,7 @@ export const NAMURA_FITMENT = {
 };
 
 export function namuraPartNumber(title='') {
-  return String(title).toUpperCase().match(/\b(?:NA|CA)-[0-9]{5}(?:-[0-9A-Z]+)?K?\b/)?.[0] || '';
+  return String(title).toUpperCase().match(/\b(?:NA|CA)-[0-9]{5}(?:-[0-9A-Z]+|[A-Z][0-9]*)?\b/)?.[0] || '';
 }
 export function namuraFitment(title='') {
   const part=namuraPartNumber(title);
