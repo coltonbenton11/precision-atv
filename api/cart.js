@@ -29,6 +29,7 @@ export default async function handler(req,res){
     cartCreate(input:$input){
       cart{
         id checkoutUrl buyerIdentity{countryCode}
+        cost{totalAmount{currencyCode}}
         lines(first:10){nodes{quantity merchandise{... on ProductVariant{id availableForSale}}}}
       }
       userErrors{code field message}
@@ -41,6 +42,9 @@ export default async function handler(req,res){
       method:'POST',
       headers:{'content-type':'application/json','X-Shopify-Storefront-Access-Token':token},
       body:JSON.stringify({query,variables:{input:{
+        // Default the initial checkout context to the United States.
+        // The customer's actual shipping country is selected in Shopify checkout.
+        buyerIdentity:{countryCode:'US'},
         lines:[{merchandiseId:variantId,quantity,attributes:[{key:'VIN',value:vin}]}],
         attributes:[{key:'storefront',value:'precision-atv-vercel'},{key:'Vehicle VIN',value:vin}]
       }}})
@@ -87,6 +91,16 @@ export default async function handler(req,res){
       return res.status(409).json({
         error:`${message} Please contact the shop so we can check this option before you pay.`,
         code:stockOrMarketWarning?.code||'CART_LINE_MISMATCH'
+      });
+    }
+
+    // Precision ATV quotes and collects payment in USD across all Shopify markets.
+    const currency=cart.cost?.totalAmount?.currencyCode;
+    if(currency!=='USD'){
+      console.error('Unexpected Shopify cart currency',{currency,country:cart.buyerIdentity?.countryCode});
+      return res.status(409).json({
+        error:'Shopify returned an unexpected checkout currency. Please try again or contact the shop.',
+        code:'UNEXPECTED_CHECKOUT_CURRENCY'
       });
     }
 
