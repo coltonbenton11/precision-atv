@@ -11,8 +11,9 @@
     <div class="engine-finder-actions"><button id="findEngine" class="btn" type="button">Find engines</button><button id="clearEngine" class="btn ghost" type="button">Clear</button></div>
   </div>
 </div>
+<nav aria-label="Shop engine categories" class="shop-category-links"><a href="/engines/polaris">Polaris Rebuilt Engines</a><a href="/engines/can-am">Can-Am Rebuilt Engines</a><a href="/rebuild-kits-parts">Rebuild Kits &amp; Parts</a></nav>
 <div class="shop-tools">
-  <div class="filters"><button class="chip active" data-filter="all">All products</button><button class="chip" data-filter="engine">Engines</button><button class="chip" data-filter="part">Parts & kits</button><button class="chip" data-filter="ecu">ECU tuning</button><button class="chip" data-filter="access">Supporting components</button></div>
+  <div class="filters"><button class="chip active" data-filter="all">All products</button><button class="chip" data-filter="engine">Engines</button><button class="chip" data-filter="part">Rebuild Kits &amp; Parts</button><button class="chip" data-filter="ecu">ECU tuning</button></div>
   <input class="search" id="search" placeholder="Search the full catalog…">
 </div>
 <div class="catalog-meta"><span id="catalogCount">Loading catalog…</span><span id="catalogMode"></span></div>
@@ -30,10 +31,10 @@ const showMore=document.getElementById('showMore');
 function clean(v){return String(v||'').trim().toLowerCase()}
 function productText(p){return clean(p.searchText||[p.title,p.productType,p.vendor,...(p.tags||[])].join(' '))}
 function category(p){
-  const s=productText(p);
-  if(/\becu\b|reflash|tuning/.test(s))return'ecu';
-  if(/\bengine\b|remanufactured|rebuilt engine/.test(s))return'engine';
-  if(/access|winch|diff|retrieval/.test(s))return'access';
+  const title=clean(p.title);
+  if(/\becu\b|reflash|tuning/.test(title))return'ecu';
+  if(/\bnamura\b|\b(top.end|piston|cylinder.only|gasket|rebuild kit|repair kit|shim conversion|bearing|valve|winch|diff|spark plug|retrieval)\b/.test(title))return'part';
+  if(/remanufactured|rebuilt engine|remanufactored|long.block/.test(title))return'engine';
   return'part'
 }
 function brandMatch(p,brand){
@@ -114,10 +115,12 @@ function clearEngineFinder(){
   }
 })();
 document.querySelectorAll('.chip').forEach(b=>b.onclick=()=>{engineFinderActive=false;setFilter(b.dataset.filter)});
+const selectedFilter=new URLSearchParams(location.search).get('filter');
+if(['engine','part','ecu'].includes(selectedFilter))setFilter(selectedFilter);
 document.getElementById('search').oninput=()=>{visibleCount=60;render()};
 document.getElementById('findEngine').onclick=runEngineFinder;
 document.getElementById('clearEngine').onclick=clearEngineFinder;
 document.getElementById('engineYear').addEventListener('keydown',e=>{if(e.key==='Enter')runEngineFinder()});
 document.getElementById('engineModel').addEventListener('keydown',e=>{if(e.key==='Enter')runEngineFinder()});
 showMore.onclick=()=>{visibleCount+=60;render()};
-</script></script></body></html>
+</script></body></html>
