@@ -11,9 +11,8 @@
     <div class="engine-finder-actions"><button id="findEngine" class="btn" type="button">Find engines</button><button id="clearEngine" class="btn ghost" type="button">Clear</button></div>
   </div>
 </div>
-<nav aria-label="Shop engine categories" class="shop-category-links"><a href="/engines/polaris">Polaris Rebuilt Engines</a><a href="/engines/can-am">Can-Am Rebuilt Engines</a><a href="/rebuild-kits-parts">Rebuild Kits &amp; Parts</a></nav>
 <div class="shop-tools">
-  <div class="filters"><button class="chip active" data-filter="all">All products</button><button class="chip" data-filter="engine">Engines</button><button class="chip" data-filter="part">Rebuild Kits &amp; Parts</button><button class="chip" data-filter="ecu">ECU tuning</button></div>
+  <div class="filters" aria-label="Shop product categories"><button class="chip active" data-filter="engine" type="button" aria-pressed="true">Engines</button><button class="chip" data-filter="part" type="button" aria-pressed="false">Rebuild Kits &amp; Parts</button></div>
   <input class="search" id="search" placeholder="Search the full catalog…">
 </div>
 <div class="catalog-meta"><span id="catalogCount">Loading catalog…</span><span id="catalogMode"></span></div>
@@ -22,7 +21,7 @@
 <div class="catalog-more"><button id="showMore" class="btn ghost" type="button" hidden>Show more products</button></div>
 </div></section>
 <footer class="footer"><div class="wrap footer-grid"><div><div class="brand">PRECISION <span>ATV</span></div><p>1801 N Loop 336 E • Conroe, TX 77301 • (936) 228-7655</p></div><div class="policy-links"><a href="/shop">Shop</a><a href="/services">Engine Builds & Tuning</a><a href="/about">About</a><a href="/contact">Contact</a><a href="/admin">Admin</a><a href="https://precisionatv-com.myshopify.com/policies/refund-policy">Returns</a><a href="https://precisionatv-com.myshopify.com/policies/privacy-policy">Privacy</a></div></div></footer><script src="/site.js"></script><script>
-let products=[],filter='all',visibleCount=60,engineFinderActive=false;
+let products=[],filter='engine',visibleCount=60,engineFinderActive=false;
 const catalog=document.getElementById('catalog');
 const countEl=document.getElementById('catalogCount');
 const modeEl=document.getElementById('catalogMode');
@@ -32,7 +31,6 @@ function clean(v){return String(v||'').trim().toLowerCase()}
 function productText(p){return clean(p.searchText||[p.title,p.productType,p.vendor,...(p.tags||[])].join(' '))}
 function category(p){
   const title=clean(p.title);
-  if(/\becu\b|reflash|tuning/.test(title))return'ecu';
   if(/\bnamura\b|\b(top.end|piston|cylinder.only|gasket|rebuild kit|repair kit|shim conversion|bearing|valve|winch|diff|spark plug|retrieval)\b/.test(title))return'part';
   if(/remanufactured|rebuilt engine|remanufactored|long.block/.test(title))return'engine';
   return'part'
@@ -65,7 +63,7 @@ function engineFinderMatch(p){
 }
 function currentList(){
   const q=clean(document.getElementById('search').value);
-  return products.filter(p=>(filter==='all'||category(p)===filter)&&engineFinderMatch(p)&&(!q||q.split(/\s+/).every(term=>productText(p).includes(term))))
+  return products.filter(p=>category(p)===filter&&engineFinderMatch(p)&&(!q||q.split(/\s+/).every(term=>productText(p).includes(term))))
 }
 function render(){
   const list=currentList();
@@ -78,7 +76,7 @@ function render(){
 }
 function setFilter(next){
   filter=next;visibleCount=60;
-  document.querySelectorAll('.chip').forEach(x=>x.classList.toggle('active',x.dataset.filter===filter));
+  document.querySelectorAll('.chip').forEach(x=>{const active=x.dataset.filter===filter;x.classList.toggle('active',active);x.setAttribute('aria-pressed',String(active))});
   render()
 }
 function runEngineFinder(){
@@ -87,7 +85,7 @@ function runEngineFinder(){
   const model=clean(document.getElementById('engineModel').value);
   engineFinderActive=Boolean(brand||year||model);
   filter='engine';visibleCount=60;
-  document.querySelectorAll('.chip').forEach(x=>x.classList.toggle('active',x.dataset.filter==='engine'));
+  document.querySelectorAll('.chip').forEach(x=>{const active=x.dataset.filter==='engine';x.classList.toggle('active',active);x.setAttribute('aria-pressed',String(active))});
   render();
   document.getElementById('catalog').scrollIntoView({behavior:'smooth',block:'start'})
 }
@@ -95,8 +93,8 @@ function clearEngineFinder(){
   document.getElementById('engineBrand').value='';
   document.getElementById('engineYear').value='';
   document.getElementById('engineModel').value='';
-  engineFinderActive=false;filter='all';visibleCount=60;
-  document.querySelectorAll('.chip').forEach(x=>x.classList.toggle('active',x.dataset.filter==='all'));
+  engineFinderActive=false;filter='engine';visibleCount=60;
+  document.querySelectorAll('.chip').forEach(x=>{const active=x.dataset.filter==='engine';x.classList.toggle('active',active);x.setAttribute('aria-pressed',String(active))});
   render()
 }
 (async()=>{
@@ -116,7 +114,7 @@ function clearEngineFinder(){
 })();
 document.querySelectorAll('.chip').forEach(b=>b.onclick=()=>{engineFinderActive=false;setFilter(b.dataset.filter)});
 const selectedFilter=new URLSearchParams(location.search).get('filter');
-if(['engine','part','ecu'].includes(selectedFilter))setFilter(selectedFilter);
+if(['engine','part'].includes(selectedFilter))setFilter(selectedFilter);
 document.getElementById('search').oninput=()=>{visibleCount=60;render()};
 document.getElementById('findEngine').onclick=runEngineFinder;
 document.getElementById('clearEngine').onclick=clearEngineFinder;
