@@ -1,3 +1,4 @@
+import { namuraFitment } from './_namuraFitment.js';
 const API_VERSION='2026-07';
 const BASE='https://precisionatvfab.com';
 
@@ -29,23 +30,26 @@ export default async function handler(req,res){
     }
 
     const variants=p.variants?.nodes||[];
+    const fitment=namuraFitment(p.title);
     const selected=variants.find(v=>v.availableForSale)||variants[0];
     const images=(p.images?.nodes?.length?p.images.nodes:(p.featuredImage?[p.featuredImage]:[]));
     const canonical=`${BASE}/products/${encodeURIComponent(p.handle)}`;
-    const metaTitle=p.seo?.title||`${p.title} | Precision ATV`;
-    const metaDescription=p.seo?.description||strip(p.descriptionHtml).slice(0,155)||`Shop ${p.title} from Precision ATV in Conroe, Texas.`;
+    const metaTitle=p.seo?.title||(fitment?`${fitment.part} ${fitment.spec} | Precision ATV`:`${p.title} | Precision ATV`);
+    const metaDescription=p.seo?.description||(fitment?`Namura ${fitment.part}: ${fitment.models}`.slice(0,155):strip(p.descriptionHtml).slice(0,155))||`Shop ${p.title} from Precision ATV in Conroe, Texas.`;
     const mainImage=images[0]?.url||'';
     const currency=selected?.price?.currencyCode||'USD';
     const schema={
       '@context':'https://schema.org','@type':'Product',
       name:p.title,description:strip(p.descriptionHtml),image:images.map(i=>i.url),brand:{'@type':'Brand',name:p.vendor||'Precision ATV'},
-      sku:selected?.id||p.id,
+      sku:fitment?.part||selected?.id||p.id,
+      ...(fitment?{mpn:fitment.part,additionalProperty:[{'@type':'PropertyValue',name:'Compatible applications',value:fitment.models}]}:{}),
       offers:variants.map(v=>({'@type':'Offer',url:canonical,priceCurrency:v.price?.currencyCode||'USD',price:v.price?.amount||0,availability:v.availableForSale?'https://schema.org/InStock':'https://schema.org/OutOfStock'}))
     };
     const variantOptions=variants.map(v=>`<option value="${esc(v.id)}" data-price="${esc(v.price?.amount||0)}" data-currency="${esc(v.price?.currencyCode||'USD')}" data-available="${v.availableForSale?'1':'0'}" ${v.id===selected?.id?'selected':''}>${esc(v.title==='Default Title'?'Standard':v.title)} — ${esc(money(v.price?.amount,v.price?.currencyCode))}${v.availableForSale?'':' — Sold out'}</option>`).join('');
     const thumbs=images.map((img,i)=>`<button class="thumb ${i===0?'active':''}" type="button" onclick="swapImage(this,'${esc(img.url)}')"><img src="${esc(img.url)}" alt="${esc(img.altText||p.title)}"></button>`).join('');
     const compare=selected?.compareAtPrice&&Number(selected.compareAtPrice.amount)>Number(selected.price?.amount)?`<span class="compare-price">${esc(money(selected.compareAtPrice.amount,selected.compareAtPrice.currencyCode))}</span>`:'';
 
+    const fitmentHtml=fitment?`<section class="product-copy"><div><div class="kicker">Namura fitment</div><h2>Compatible units & part number.</h2></div><div class="description"><p><strong>Manufacturer part # ${esc(fitment.part)}</strong></p><p>${esc(fitment.spec)}</p><p><strong>Catalog applications:</strong> ${esc(fitment.models)}</p><p>Confirm your vehicle year, engine variant and bore before ordering. Supplier SKUs may differ from Namura manufacturer numbers.</p></div></section>`:'';
     const head=`<meta name="description" content="${esc(metaDescription)}"><link rel="canonical" href="${esc(canonical)}"><meta property="og:type" content="product"><meta property="og:title" content="${esc(metaTitle)}"><meta property="og:description" content="${esc(metaDescription)}"><meta property="og:url" content="${esc(canonical)}">${mainImage?`<meta property="og:image" content="${esc(mainImage)}">`:''}<script type="application/ld+json">${safeJson(schema)}</script>`;
     const body=`
 <div class="topbar"><div class="wrap"><div>CONROE, TEXAS • BUILT FOR THE RIDE</div><div>Fitment help: <a href="tel:+19362287655">(936) 228-7655</a></div></div></div>
@@ -77,6 +81,7 @@ export default async function handler(req,res){
     </div>
   </div>
 </div>
+${fitmentHtml}
 <div class="product-copy"><div><div class="kicker">Product details</div><h2>What you need to know.</h2></div><div class="description">${p.descriptionHtml||'<p>Contact Precision ATV for specifications and fitment information.</p>'}</div></div>
 </div></section>
 <section class="band"><div class="wrap"><div><h2>Not sure it fits?</h2><p>Talk to our engine team before you order. We’ll help match the engine, part, or tune to your application.</p></div><a class="btn" href="tel:+19362287655">Call (936) 228-7655</a></div></section>
