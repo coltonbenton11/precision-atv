@@ -23,7 +23,7 @@ const SECTIONS={
     description:'Shop ATV and UTV engine rebuild kits, Namura top-end kits, cylinders, pistons and engine components for Polaris, Can-Am and other powersports applications.',
     lead:'Shop rebuild kits and engine parts, including model-specific Namura top-end kits, pistons, cylinders, gaskets and related engine components. Search by part number, vehicle make, model or year to narrow fitment.',
     path:'/rebuild-kits-parts',
-    isMatch:p=>!isEngine(p.title)&&!/(?:\\becu\\b|reflash|tuning)/i.test(p.title)
+    isMatch:p=>!isEngine(p.title)&&!/(?:ecu|reflash|tuning)/i.test(p.title)
   }
 };
 function isEngine(s=''){return /remanufactured|rebuilt engine|remanufactored|long.block/i.test(s)}
@@ -45,7 +45,7 @@ async function products(domain,token){
 export default async function handler(req,res){
   const section=SECTIONS[String(req.query.section||'')];
   if(!section)return res.status(404).send('Not found');
-  const domain=String(process.env.SHOPIFY_STORE_DOMAIN||'').replace(/^https?:\\/\\//,'').replace(/\\/$/,'');
+  const domain=String(process.env.SHOPIFY_STORE_DOMAIN||'').replace('https://','').replace('http://','').replace(/[/]$/,'');
   const token=process.env.SHOPIFY_STOREFRONT_TOKEN||process.env.SHOPIFY_STOREFRONT_ACCESS_TOKEN||process.env.SHOPIFY_STOREFRONT_PUBLIC_ACCESS_TOKEN;
   let all=[],message='';
   if(domain&&token){try{all=await products(domain,token)}catch(e){message='Catalog temporarily unavailable; please use our full shop or call for current availability.'}}
