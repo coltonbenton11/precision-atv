@@ -3,16 +3,16 @@
 <header class="page-hero"><div class="wrap"><div class="kicker">Shop Precision ATV</div><h1>THE RIGHT PARTS.<br>FOR YOUR NEXT RIDE.</h1><p class="muted">Shop remanufactured engines, rebuild kits, parts and ECU tuning backed by real engine-building experience in Conroe, Texas.</p></div></header>
 <section><div class="wrap">
 <div class="engine-finder">
-  <div class="engine-finder-copy"><div class="kicker">Engine Finder</div><h2>Find the engine for your machine.</h2><p>Search the full catalog by brand, year, model, or engine size.</p></div>
+  <div class="engine-finder-copy"><div class="kicker">Engine Finder</div><h2>Find engines, rebuild kits &amp; parts for your machine.</h2><p>Search by brand, year, model, or engine size. Check exact fitment before ordering.</p></div>
   <div class="engine-finder-fields">
     <label><span>Brand</span><select id="engineBrand" class="select"><option value="">Any brand</option><option>Polaris</option><option>Can-Am</option><option>Honda</option><option>Yamaha</option><option>Kawasaki</option><option>Suzuki</option><option>Arctic Cat</option></select></label>
     <label><span>Year</span><input id="engineYear" class="search" inputmode="numeric" maxlength="4" placeholder="2021"></label>
     <label class="engine-model"><span>Model / engine</span><input id="engineModel" class="search" placeholder="RZR XP 1000, Defender HD10…"></label>
-    <div class="engine-finder-actions"><button id="findEngine" class="btn" type="button">Find engines</button><button id="clearEngine" class="btn ghost" type="button">Clear</button></div>
+    <div class="engine-finder-actions"><button id="findEngine" class="btn" type="button">Find products</button><button id="clearEngine" class="btn ghost" type="button">Clear</button></div>
   </div>
 </div>
 <div class="shop-tools">
-  <div class="filters" aria-label="Shop product categories"><button class="chip active" data-filter="engine" type="button" aria-pressed="true">Engines</button><button class="chip" data-filter="part" type="button" aria-pressed="false">Rebuild Kits &amp; Parts</button></div>
+  <div class="filters" aria-label="Shop product categories"><button class="chip" data-filter="all" type="button" aria-pressed="false">All Results</button><button class="chip active" data-filter="engine" type="button" aria-pressed="true">Engines</button><button class="chip" data-filter="part" type="button" aria-pressed="false">Rebuild Kits &amp; Parts</button></div>
   <input class="search" id="search" placeholder="Search the full catalog…">
 </div>
 <div class="catalog-meta"><span id="catalogCount">Loading catalog…</span><span id="catalogMode"></span></div>
@@ -46,15 +46,17 @@ function yearMatch(p,year){
   const y=Number(year);
   if(!year)return true;
   if(!Number.isInteger(y)||y<1980||y>2035)return false;
-  const s=String(p.title||'');
+  // Kits can list application years in supplier fitment metadata, not in the product title.
+  const s=[p.title,p.searchText].filter(Boolean).join(' ');
   const ranges=[...s.matchAll(/\b((?:19|20)\d{2})\s*[-–—]\s*((?:19|20)\d{2})\b/g)];
   if(ranges.some(m=>y>=Number(m[1])&&y<=Number(m[2])))return true;
   const years=[...s.matchAll(/\b((?:19|20)\d{2})\b/g)].map(m=>Number(m[1]));
-  return years.includes(y)
+  if(years.includes(y))return true;
+  // Keep year-unspecified kits discoverable, without implying confirmed compatibility.
+  return category(p)==='part'&&years.length===0
 }
 function engineFinderMatch(p){
   if(!engineFinderActive)return true;
-  if(category(p)!=='engine')return false;
   const brand=document.getElementById('engineBrand').value;
   const year=clean(document.getElementById('engineYear').value);
   const model=clean(document.getElementById('engineModel').value);
@@ -63,14 +65,24 @@ function engineFinderMatch(p){
 }
 function currentList(){
   const q=clean(document.getElementById('search').value);
-  return products.filter(p=>category(p)===filter&&engineFinderMatch(p)&&(!q||q.split(/\s+/).every(term=>productText(p).includes(term))))
+  const matches=products.filter(p=>(filter==='all'||category(p)===filter)&&engineFinderMatch(p)&&(!q||q.split(/\s+/).every(term=>productText(p).includes(term))));
+  if(filter!=='all')return matches;
+  // Mix engines and kits so parts aren't buried behind the first 60 engines.
+  const engines=matches.filter(p=>category(p)==='engine');
+  const parts=matches.filter(p=>category(p)==='part');
+  const mixed=[];
+  for(let i=0;i<Math.max(engines.length,parts.length);i++){
+    if(engines[i])mixed.push(engines[i]);
+    if(parts[i])mixed.push(parts[i]);
+  }
+  return mixed
 }
 function render(){
   const list=currentList();
   const shown=list.slice(0,visibleCount);
-  catalog.innerHTML=shown.map(p=>`<article class="product"><a class="product-card-link" href="/products/${encodeURIComponent(p.handle)}" onclick="track('select_item',{item_list_name:'shop',items:[{item_id:'${p.id}',item_name:'${p.title.replace(/'/g,"\\'")}'}]})">${p.image?`<div class="product-media"><img src="${p.image}" alt="${p.title.replace(/"/g,'&quot;')}"></div>`:`<div class="product-media">${(p.vendor||'PRECISION ATV').toUpperCase()}</div>`}<div class="product-body"><div class="product-type">${p.productType||category(p)}</div><div class="product-title">${p.title}</div><div class="price">${money(p.price,p.currency)}</div><span class="btn">View details</span></div></a></article>`).join('')||'<div class="notice" style="grid-column:1/-1">No matching products. Try removing a filter or call the shop for fitment help.</div>';
+  catalog.innerHTML=shown.map(p=>`<article class="product"><a class="product-card-link" href="/products/${encodeURIComponent(p.handle)}" onclick="track('select_item',{item_list_name:'shop',items:[{item_id:'${p.id}',item_name:'${p.title.replace(/'/g,"\\'")}'}]})">${p.image?`<div class="product-media"><img src="${p.image}" alt="${p.title.replace(/"/g,'&quot;')}"></div>`:`<div class="product-media">${(p.vendor||'PRECISION ATV').toUpperCase()}</div>`}<div class="product-body"><div class="product-type">${category(p)==="engine"?"Complete engine":"Rebuild kits & parts"}${engineFinderActive&&category(p)==="part"&&clean(document.getElementById("engineYear").value)&&!/\b(?:19|20)\d{2}\b/.test([p.title,p.searchText].filter(Boolean).join(" "))?" · Verify year fitment":""}</div><div class="product-title">${p.title}</div><div class="price">${money(p.price,p.currency)}</div><span class="btn">View details</span></div></a></article>`).join('')||'<div class="notice" style="grid-column:1/-1">No matching products. Try removing a filter or call the shop for fitment help.</div>';
   countEl.textContent=list.length===products.length?`${products.length} products in catalog`:`Showing ${list.length} matching products of ${products.length}`;
-  modeEl.textContent=engineFinderActive?'Engine Finder active':'';
+  modeEl.textContent=engineFinderActive?'Finder active · Confirm exact model/year fitment before ordering':'';
   showMore.hidden=shown.length>=list.length;
   showMore.textContent=`Show more products (${list.length-shown.length} remaining)`;
 }
@@ -84,8 +96,8 @@ function runEngineFinder(){
   const year=clean(document.getElementById('engineYear').value);
   const model=clean(document.getElementById('engineModel').value);
   engineFinderActive=Boolean(brand||year||model);
-  filter='engine';visibleCount=60;
-  document.querySelectorAll('.chip').forEach(x=>{const active=x.dataset.filter==='engine';x.classList.toggle('active',active);x.setAttribute('aria-pressed',String(active))});
+  filter='all';visibleCount=60;
+  document.querySelectorAll('.chip').forEach(x=>{const active=x.dataset.filter==='all';x.classList.toggle('active',active);x.setAttribute('aria-pressed',String(active))});
   render();
   document.getElementById('catalog').scrollIntoView({behavior:'smooth',block:'start'})
 }
@@ -112,9 +124,9 @@ function clearEngineFinder(){
     countEl.textContent='Catalog unavailable'
   }
 })();
-document.querySelectorAll('.chip').forEach(b=>b.onclick=()=>{engineFinderActive=false;setFilter(b.dataset.filter)});
+document.querySelectorAll('.chip').forEach(b=>b.onclick=()=>setFilter(b.dataset.filter));
 const selectedFilter=new URLSearchParams(location.search).get('filter');
-if(['engine','part'].includes(selectedFilter))setFilter(selectedFilter);
+if(['all','engine','part'].includes(selectedFilter))setFilter(selectedFilter);
 document.getElementById('search').oninput=()=>{visibleCount=60;render()};
 document.getElementById('findEngine').onclick=runEngineFinder;
 document.getElementById('clearEngine').onclick=clearEngineFinder;
