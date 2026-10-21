@@ -6,7 +6,7 @@ function esc(value=''){return String(value).replace(/[&<>"']/g,c=>({'&':'&amp;',
 function strip(html=''){return String(html).replace(/<[^>]*>/g,' ').replace(/\s+/g,' ').trim()}
 function safeJson(value){return JSON.stringify(value).replace(/</g,'\\u003c').replace(/>/g,'\\u003e').replace(/&/g,'\\u0026')}
 function money(amount,currency='USD'){try{return new Intl.NumberFormat('en-US',{style:'currency',currency}).format(Number(amount||0))}catch{return '$'+amount}}
-function shell(title,body,head=''){return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(title)}</title>${head}<link rel="stylesheet" href="/styles.css"><script defer src="/_vercel/insights/script.js"></script></head><body>${body}<script src="/site.js"></script></body></html>`}
+function shell(title,body,head=''){return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(title)}</title>${head}<link rel="stylesheet" href="/styles.css"><script src="/site.js"></script><script defer src="/_vercel/insights/script.js"></script></head><body>${body}</body></html>`}
 
 export default async function handler(req,res){
   const handle=String(req.query.handle||'').trim();
@@ -29,7 +29,7 @@ export default async function handler(req,res){
       return res.send(shell('Product not found | Precision ATV',`<nav class="nav"><div class="wrap"><a class="brand" href="/">PRECISION <span>ATV</span></a><div class="navlinks"><a href="/shop">Shop</a><a href="/services">Engine Builds & Tuning</a><a href="/#shop">Our Shop</a></div></div></nav><section><div class="wrap"><div class="card"><h1>Product not found.</h1><p class="muted">This item may have moved or is no longer available.</p><a class="btn" href="/shop">Back to shop</a></div></div></section>`));
     }
 
-    const requiresVin=(p.tags||[]).some(t=>['vin-required','requires-vin'].includes(String(t).toLowerCase())) || (/\b(remanufactured|remanufactored|rebuilt\s+engine|long[ -]?block|complete\s+engine|ecu\s+(reflash|tuning?)|bench\s+(ecu\s+)?reflash)\b/i.test(p.title)||/^(remanufactured\s+)?engines?$/i.test(p.productType||''));
+    const requiresVin=!(p.tags||[]).some(t=>String(t).toLowerCase()==='vin-not-required') && ((p.tags||[]).some(t=>['vin-required','requires-vin'].includes(String(t).toLowerCase())) || (/\b(remanufactured|remanufactored|rebuilt\s+engine|long[ -]?block|complete\s+engine|ecu\s+(reflash|tuning?)|bench\s+(ecu\s+)?reflash)\b/i.test(p.title)||/^(remanufactured\s+)?engines?$/i.test(p.productType||'')));
     const variants=p.variants?.nodes||[];
     const fitment=namuraFitment(p.title);
     const selected=variants.find(v=>v.availableForSale)||variants[0];
