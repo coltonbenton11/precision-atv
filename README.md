@@ -39,7 +39,7 @@ Grant the app `read_reports` and `read_orders`. The server exchanges these crede
 For fully live Google reporting in the private dashboard, add the Google service-account email as a viewer on GA4 and as a user on the matching Google Search Console property. Without those server credentials, the storefront still collects GA4 and the dashboard can show the Search Console snapshot.
 
 ## Shopify behavior
-If Shopify credentials are missing, the site uses a 33-product preview catalog based on the existing Precision ATV store. Once credentials are added, `/api/products` automatically switches to live Shopify products, prices, variants, availability and product images. Checkout is created through Shopify's Storefront Cart API.
+If Shopify credentials are missing or the API is unavailable, the production store shows an unavailable state rather than fictitious preview products. With valid credentials, `/api/products` returns live Shopify products and prices. Checkout is created through Shopify's Storefront Cart API.
 
 ## Shopify → inFlow → QuickBooks → Manufacturing automation
 
@@ -107,3 +107,16 @@ The public storefront has no analytics link. Owners sign in at `/admin`. Authent
 <!-- post-cooldown deploy retry -->
 <!-- pro-plan production deploy -->
 <!-- redeploy: shopify storefront env refresh -->
+
+## Customer and dealer journey (October 2026)
+
+- Retail catalog, fitment finder, individual product pages and browser cart run on Vercel. `/cart` creates an authoritative multi-line Shopify cart only when the shopper checks out. Shopify always recalculates inventory, taxes, final prices and payment details.
+- Engine/ECU reflash products require a vehicle VIN; standard parts do not. Merchants can override engine detection with Shopify product tags `vin-required` or `vin-not-required`.
+- Approved B2B dealers **must use /dealer**, which links to Shopify's native Customer Accounts and B2B storefront. That preserves location-specific Gold Dealer catalogs, payment terms, and pricing instead of accidentally creating a retail cart. The Vercel shop does not impersonate Shopify B2B users or quote wholesale prices.
+- The main `precisionatvfab.com` domain remains on Shopify until an authenticated headless B2B experience is implemented and tested. Do not point DNS to Vercel while dealer shopping still relies on the Shopify domain.
+- Vercel customer-facing production URL must allow unauthenticated customers to load pages. Keep preview deployments protected. Admin dashboard is separately protected by `DASHBOARD_KEY` and now fails closed when the key is missing.
+- Never fall back to mock product listings in production when Shopify is unavailable. Show an unavailable state instead.
+
+## Release verification
+
+Run `npm test` (Node 22+) before merging. Verify anonymous access to `/shop`, `/dealer`, and `/cart`; Shopify B2B login for an **approved test dealer**; Gold Dealer price at checkout; retail parts purchase without VIN; engine purchase with VIN; multiple-item cart; and secure checkout. Do not place a paid order unless using an explicitly authorized test payment method. Changing the main domain or Shopify B2B authentication setup requires a separate cutover review.
