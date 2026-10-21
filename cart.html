@@ -1,0 +1,49 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Your Cart | Precision ATV</title><meta name="robots" content="noindex,follow"><link rel="stylesheet" href="/styles.css"></head><body>
+<div class="topbar"><div class="wrap"><div>PRECISION ATV • SECURE SHOPIFY CHECKOUT</div><div><a href="tel:+19362287655">(936) 228-7655</a></div></div></div>
+<nav class="nav"><div class="wrap"><a class="brand" href="/">PRECISION <span>ATV</span></a><div class="navlinks"><a href="/shop">Continue Shopping</a><a href="/dealer">Dealer Login</a><a href="/contact">Contact</a></div><div class="mobile-actions"><a href="/shop">Shop</a><a href="/dealer">Dealer</a></div></div></nav>
+<header class="page-hero"><div class="wrap"><div class="kicker">Retail orders</div><h1>YOUR CART.</h1><p class="muted">Review your items before secure Shopify checkout. Final inventory, totals, shipping and taxes are verified by Shopify.</p></div></header>
+<section><div class="wrap"><div id="cartNotice" class="notice" hidden role="alert"></div><div id="cartItems" class="cart-list"></div><div id="cartSummary" class="cart-summary" hidden><div><strong id="cartEstimate"></strong><p class="muted">Estimate before taxes and shipping. Final charges are confirmed at checkout.</p></div><button id="checkoutBtn" class="btn" type="button">Secure checkout</button></div><div class="notice" id="emptyCart" hidden>Your cart is empty. <a href="/shop"><u>Browse products</u></a>.</div><p class="muted">Dealer? <a href="/dealer"><u>Sign in to your approved company account</u></a> instead to receive your assigned B2B catalog and prices.</p></div></section>
+<footer class="footer"><div class="wrap footer-grid"><div class="brand">PRECISION <span>ATV</span></div><div class="policy-links"><a href="/shop">Shop</a><a href="/dealer">Dealer Account</a><a href="/contact">Contact</a></div></div></footer>
+<script src="/site.js"></script><script>
+const listEl=document.getElementById('cartItems'),noticeEl=document.getElementById('cartNotice');
+const escapeHtml=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function renderCart(){
+  const list=window.PATVCart.list();
+  document.getElementById('emptyCart').hidden=!!list.length;
+  document.getElementById('cartSummary').hidden=!list.length;
+  listEl.innerHTML=list.map((item,i)=>`<div class="cart-line">
+    ${item.image?`<img class="cart-image" src="${escapeHtml(item.image)}" alt="">`:''}
+    <div class="cart-description"><a href="/products/${encodeURIComponent(item.handle||'')}"><strong>${escapeHtml(item.title)}</strong></a><p class="muted">${escapeHtml(item.variantTitle||'')}</p>${item.vin?`<p class="muted">VIN: ${escapeHtml(item.vin)}</p>`:''}</div>
+    <div class="cart-controls"><label>Qty <input data-quantity="${i}" type="number" min="1" max="100" value="${Number(item.quantity)||1}"></label><button class="btn ghost" type="button" data-remove="${i}">Remove</button></div>
+  </div>`).join('');
+  const total=list.reduce((sum,item)=>sum+Number(item.price||0)*Number(item.quantity||0),0);
+  document.getElementById('cartEstimate').textContent='Estimated subtotal: '+new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'}).format(total);
+}
+listEl.addEventListener('click',e=>{
+  const remove=e.target.closest('[data-remove]');if(!remove)return;
+  const items=window.PATVCart.list();items.splice(Number(remove.dataset.remove),1);window.PATVCart.save(items);renderCart();
+});
+listEl.addEventListener('change',e=>{
+  const el=e.target.closest('[data-quantity]');if(!el)return;
+  const qty=Number(el.value);
+  if(!Number.isInteger(qty)||qty<1||qty>100){renderCart();return}
+  const items=window.PATVCart.list();if(items[Number(el.dataset.quantity)])items[Number(el.dataset.quantity)].quantity=qty;
+  window.PATVCart.save(items);renderCart();
+});
+document.getElementById('checkoutBtn').addEventListener('click',async()=>{
+  const items=window.PATVCart.list();
+  if(!items.length)return;
+  const btn=document.getElementById('checkoutBtn');btn.disabled=true;btn.textContent='Starting secure checkout…';
+  noticeEl.hidden=true;
+  try{
+    const response=await fetch('/api/cart',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({items:items.map(x=>({variantId:x.variantId,quantity:x.quantity,vin:x.vin||''}))})});
+    const data=await response.json();
+    if(!response.ok||!data.checkoutUrl)throw new Error(data.error||'Checkout is unavailable');
+    window.location.assign(data.checkoutUrl);
+  }catch(err){
+    noticeEl.textContent=err.message||'Unable to start checkout';noticeEl.hidden=false;
+    btn.disabled=false;btn.textContent='Secure checkout';
+  }
+});
+renderCart();
+</script></body></html>
