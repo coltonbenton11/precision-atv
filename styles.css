@@ -46,3 +46,12 @@
 .shop-category-links a:hover,.shop-category-links a:focus-visible{border-color:var(--accent);color:var(--accent)}
 .seo-category-bar{padding:16px 0 8px;border-bottom:1px solid var(--line)}
 .seo-category-bar .shop-category-links{margin:12px 0}
+
+/* Retail cart and dealer account */
+.cart-list{display:grid;gap:14px}.cart-line{display:flex;gap:20px;align-items:center;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px}
+.cart-image{width:100px;height:100px;object-fit:contain;background:#fff;border-radius:8px}
+.cart-description{flex:1;min-width:0}.cart-description strong{overflow-wrap:anywhere}.cart-description p{margin:5px 0}
+.cart-controls{display:flex;gap:12px;align-items:center}.cart-controls input{width:70px;max-width:100%;padding:10px;background:#181d23;border:1px solid #444;color:#fff;border-radius:8px}
+.cart-summary{display:flex;align-items:center;justify-content:space-between;gap:24px;margin:24px 0;padding:20px;background:var(--panel);border:1px solid var(--line);border-radius:14px}
+@media(max-width:640px){.cart-line,.cart-summary{flex-direction:column;align-items:stretch}.cart-image{width:88px;height:88px}.cart-controls{justify-content:space-between}}
+[hidden]{display:none!important}

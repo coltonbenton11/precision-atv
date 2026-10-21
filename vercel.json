@@ -145,11 +145,6 @@
       "permanent": true
     },
     {
-      "source": "/cart",
-      "destination": "/shop",
-      "permanent": true
-    },
-    {
       "source": "/policies/refund-policy",
       "destination": "https://precisionatv-com.myshopify.com/policies/refund-policy",
       "permanent": false

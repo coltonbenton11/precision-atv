@@ -3,7 +3,8 @@
   "private": true,
   "version": "1.0.0",
   "scripts": {
-    "dev": "npx serve . -l 3000"
+    "dev": "npx serve . -l 3000",
+    "test": "node --test"
   },
   "type": "module"
 }

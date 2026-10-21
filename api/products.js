@@ -72,8 +72,8 @@ export default async function handler(req,res){
   const first=Math.min(requested,100);
 
   if(!domain||!token){
-    const products=wantAll?FALLBACK:FALLBACK.slice(0,first);
-    return res.status(200).json({mode:'preview',warning:'Shopify Storefront credentials are not available to this deployment.',products,total:products.length,hasMore:false});
+    res.setHeader('Cache-Control','no-store');
+    return res.status(503).json({mode:'unavailable',error:'Shopify catalog is temporarily unavailable.',products:[],total:0,hasMore:false});
   }
 
   const query=`query Products($first:Int!,$after:String){products(first:$first,after:$after,sortKey:BEST_SELLING){pageInfo{hasNextPage endCursor}nodes{id handle title productType vendor tags featuredImage{url altText} images(first:1){nodes{url altText}} media(first:1){nodes{previewImage{url altText}}} variants(first:10){nodes{id title availableForSale price{amount currencyCode}}}}}}`;
@@ -118,7 +118,8 @@ export default async function handler(req,res){
     res.setHeader('Cache-Control','public, s-maxage=60, stale-while-revalidate=300');
     return res.status(200).json({mode:'shopify',products,total:products.length,hasMore});
   }catch(e){
-    const products=wantAll?FALLBACK:FALLBACK.slice(0,first);
-    return res.status(200).json({mode:'preview',warning:e.message,products,total:products.length,hasMore:false});
+    console.error('Shopify product feed unavailable', e);
+    res.setHeader('Cache-Control','no-store');
+    return res.status(502).json({mode:'unavailable',error:'Shopify catalog is temporarily unavailable.',products:[],total:0,hasMore:false});
   }
 }
