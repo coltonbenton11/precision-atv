@@ -18,7 +18,7 @@ export default async function handler(req,res){
   if(!handle)return res.status(400).send('Missing product handle.');
   if(!domain||!token)return res.status(503).send('Shopify is not configured.');
 
-  const query=`query ProductByHandle($handle:String!){product(handle:$handle){id handle title descriptionHtml productType vendor seo{title description} featuredImage{url altText} images(first:8){nodes{url altText}} variants(first:100){nodes{id title availableForSale selectedOptions{name value} price{amount currencyCode} compareAtPrice{amount currencyCode}}}}}`;
+  const query=`query ProductByHandle($handle:String!){product(handle:$handle){id handle title descriptionHtml productType vendor tags seo{title description} featuredImage{url altText} images(first:8){nodes{url altText}} variants(first:100){nodes{id title availableForSale selectedOptions{name value} price{amount currencyCode} compareAtPrice{amount currencyCode}}}}}`;
   try{
     const r=await fetch(`https://${domain}/api/${API_VERSION}/graphql.json`,{method:'POST',headers:{'content-type':'application/json','X-Shopify-Storefront-Access-Token':token},body:JSON.stringify({query,variables:{handle}})});
     const j=await r.json();
@@ -29,6 +29,7 @@ export default async function handler(req,res){
       return res.send(shell('Product not found | Precision ATV',`<nav class="nav"><div class="wrap"><a class="brand" href="/">PRECISION <span>ATV</span></a><div class="navlinks"><a href="/shop">Shop</a><a href="/services">Engine Builds & Tuning</a><a href="/#shop">Our Shop</a></div></div></nav><section><div class="wrap"><div class="card"><h1>Product not found.</h1><p class="muted">This item may have moved or is no longer available.</p><a class="btn" href="/shop">Back to shop</a></div></div></section>`));
     }
 
+    const requiresVin=(p.tags||[]).some(t=>['vin-required','requires-vin'].includes(String(t).toLowerCase())) || (/\b(remanufactured|remanufactored|rebuilt\s+engine|long[ -]?block|complete\s+engine|ecu\s+(reflash|tuning?)|bench\s+(ecu\s+)?reflash)\b/i.test(p.title)||/^(remanufactured\s+)?engines?$/i.test(p.productType||''));
     const variants=p.variants?.nodes||[];
     const fitment=namuraFitment(p.title);
     const selected=variants.find(v=>v.availableForSale)||variants[0];
@@ -67,13 +68,13 @@ export default async function handler(req,res){
     <div class="detail-price"><span id="price">${esc(money(selected?.price?.amount,currency))}</span> ${compare}</div>
     <div id="availability" class="availability ${selected?.availableForSale?'in':'out'}">${selected?.availableForSale?'In stock / available to order':'Currently unavailable'}</div>
     ${variants.length>1?`<label class="field-label" for="variant">Choose option</label><select class="select" id="variant">${variantOptions}</select>`:''}
-    <div class="vin-field">
+    <div class="vin-field" ${requiresVin?'':'hidden'}>
       <label class="field-label" for="vin">Vehicle VIN <span class="required-mark">*</span></label>
-      <input class="vin-input" id="vin" type="text" inputmode="text" maxlength="17" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="Enter 17-character VIN" aria-describedby="vinHelp" required>
+      <input class="vin-input" id="vin" type="text" inputmode="text" maxlength="17" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="Enter 17-character VIN" aria-describedby="vinHelp" ${requiresVin?'required':''}>
       <div id="vinHelp" class="vin-help">Required for fitment verification before checkout. Letters I, O and Q are not used in standard VINs.</div>
       <div id="vinError" class="vin-error" hidden>Please enter a valid 17-character VIN.</div>
     </div>
-    <div class="buy-row"><label><span class="field-label">Qty</span><input class="qty" id="qty" type="number" min="1" value="1"></label><button id="buyBtn" class="btn buy-main" onclick="buyNow()" disabled>Buy securely through Shopify</button></div>
+    <div class="buy-row"><label><span class="field-label">Qty</span><input class="qty" id="qty" type="number" min="1" max="100" value="1"></label><button id="addBtn" class="btn ghost" onclick="addToCart()" disabled>Add to cart</button><button id="buyBtn" class="btn buy-main" onclick="buyNow()" disabled>Buy now</button></div><p id="addFeedback" class="muted" role="status"></p><p class="muted">Approved dealer? <a href="/dealer"><u>Sign in for company pricing</u></a>.</p>
     <div class="trust-row">
       <div><b>Real shop support</b><span>Call before ordering if you need fitment help.</span></div>
       <div><b>Secure checkout</b><span>Payment, tax and shipping are handled by Shopify.</span></div>
@@ -87,6 +88,8 @@ ${fitmentHtml}
 <section class="band"><div class="wrap"><div><h2>Not sure it fits?</h2><p>Talk to our engine team before you order. We’ll help match the engine, part, or tune to your application.</p></div><a class="btn" href="tel:+19362287655">Call (936) 228-7655</a></div></section>
 <footer class="footer"><div class="wrap footer-grid"><div><div class="brand">PRECISION <span>ATV</span></div><p>1801 N Loop 336 E • Conroe, TX 77301</p></div><div class="policy-links"><a href="/shop">Shop</a><a href="/services">Engine Builds & Tuning</a><a href="/about">About</a><a href="/contact">Contact</a><a href="/admin">Admin</a><a href="https://precisionatv-com.myshopify.com/policies/refund-policy">Returns</a><a href="https://precisionatv-com.myshopify.com/policies/privacy-policy">Privacy</a></div></div></footer>
 <script>
+const requiresVin=${safeJson(requiresVin)};
+const productDetails=${safeJson({title:p.title,handle:p.handle,image:mainImage})};
 const variants=${safeJson(variants.map(v=>({id:v.id,title:v.title,available:v.availableForSale,price:v.price?.amount||0,currency:v.price?.currencyCode||'USD'})))};
 function swapImage(btn,url){document.getElementById('mainImage').src=url;document.querySelectorAll('.thumb').forEach(x=>x.classList.remove('active'));btn.classList.add('active')}
 function currentVariant(){const s=document.getElementById('variant');const id=s?s.value:${safeJson(selected?.id||'')};return variants.find(v=>v.id===id)||variants[0]}
@@ -95,12 +98,13 @@ function validVin(value){return /^[A-HJ-NPR-Z0-9]{17}$/.test(normalizeVin(value)
 function updateBuyState(){
   const v=currentVariant();
   const vin=document.getElementById('vin');
-  const valid=validVin(vin?.value);
+  const valid=!requiresVin||validVin(vin?.value);
   const btn=document.getElementById('buyBtn');
   if(btn)btn.disabled=!(v&&v.available&&valid);
-  if(vin)vin.classList.toggle('invalid',vin.value.length>0&&!valid);
+  const addBtn=document.getElementById('addBtn');if(addBtn)addBtn.disabled=!(v&&v.available&&valid);
+  if(vin)vin.classList.toggle('invalid',requiresVin&&vin.value.length>0&&!valid);
   const err=document.getElementById('vinError');
-  if(err)err.hidden=!(vin?.value.length>0&&!valid);
+  if(err)err.hidden=!(requiresVin&&vin?.value.length>0&&!valid);
 }
 function updateVariant(){const v=currentVariant();if(!v)return;document.getElementById('price').textContent=money(v.price,v.currency);const a=document.getElementById('availability');a.textContent=v.available?'In stock / available to order':'Currently unavailable';a.className='availability '+(v.available?'in':'out');updateBuyState()}
 document.getElementById('variant')?.addEventListener('change',updateVariant);
@@ -110,21 +114,32 @@ updateBuyState();
 async function buyNow(){
   const v=currentVariant();if(!v||!v.available)return;
   const vin=normalizeVin(document.getElementById('vin')?.value);
-  if(!validVin(vin)){
+  if(requiresVin&&!validVin(vin)){
     const input=document.getElementById('vin');const err=document.getElementById('vinError');
     if(input){input.classList.add('invalid');input.focus()}
     if(err)err.hidden=false;
     return;
   }
-  const qty=Math.max(1,Number(document.getElementById('qty').value)||1);
+  const qty=Math.min(100,Math.max(1,Number(document.getElementById('qty').value)||1));
   track('add_to_cart',{currency:v.currency,value:Number(v.price)*qty,items:[{item_id:v.id,item_name:${safeJson(p.title)},price:Number(v.price),quantity:qty}]});
   const btn=document.getElementById('buyBtn');btn.disabled=true;btn.textContent='Starting checkout…';
   try{
     const r=await fetch('/api/cart',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({variantId:v.id,quantity:qty,vin})});
-    const d=await r.json();if(!d.checkoutUrl)throw new Error(d.error||'Unable to start checkout');
+    const d=await r.json();if(!r.ok||!d.checkoutUrl)throw new Error(d.error||'Unable to start checkout');
     track('begin_checkout',{currency:v.currency,value:Number(v.price)*qty,items:[{item_id:v.id,item_name:${safeJson(p.title)},price:Number(v.price),quantity:qty}]});
     location.href=d.checkoutUrl
-  }catch(e){alert(e.message);btn.textContent='Buy securely through Shopify';updateBuyState()}
+  }catch(e){alert(e.message);btn.textContent='Buy now';updateBuyState()}
+}
+function addToCart(){
+  const v=currentVariant();if(!v||!v.available)return;
+  const vin=normalizeVin(document.getElementById('vin')?.value);
+  if(requiresVin&&!validVin(vin)){document.getElementById('vin')?.focus();updateBuyState();return}
+  const qty=Math.min(100,Math.max(1,Number(document.getElementById('qty').value)||1));
+  const ok=window.PATVCart?.add({variantId:v.id,title:productDetails.title,handle:productDetails.handle,
+    image:productDetails.image,variantTitle:v.title,quantity:qty,vin,price:v.price,currency:v.currency});
+  const msg=document.getElementById('addFeedback');
+  if(msg)msg.innerHTML=ok?'Added to cart. <a href="/cart"><u>View your cart</u></a>.':'Could not save your cart. Try Buy now instead.';
+  if(ok)track('add_to_cart',{currency:v.currency,value:Number(v.price)*qty,items:[{item_id:v.id,item_name:productDetails.title,price:Number(v.price),quantity:qty}]});
 }
 track('view_item',{currency:${safeJson(currency)},value:Number(${safeJson(selected?.price?.amount||0)}),items:[{item_id:${safeJson(selected?.id||p.id)},item_name:${safeJson(p.title)}}]});
 </script>`;
