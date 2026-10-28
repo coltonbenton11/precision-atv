@@ -1,0 +1,37 @@
+name: Precision ATV read-only SEO crawl
+
+on:
+  push:
+    branches:
+      - audit/seo-crawl-20261028
+    paths:
+      - scripts/seo-crawl.mjs
+      - .github/workflows/seo-crawl.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  crawl:
+    name: Audit published sitemap URLs (max 500)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout audit script
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Crawl public pages
+        run: node scripts/seo-crawl.mjs
+      - name: Publish audit summary
+        if: always()
+        run: |
+          if test -f seo-audit.md; then cat seo-audit.md >> "$GITHUB_STEP_SUMMARY"; fi
+      - name: Upload read-only audit reports
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: precision-atv-seo-audit
+          path: |
+            seo-audit.md
+            seo-audit.json
+          if-no-files-found: warn
