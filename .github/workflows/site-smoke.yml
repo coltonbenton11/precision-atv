@@ -1,0 +1,31 @@
+name: Precision ATV live storefront smoke test
+on:
+  push:
+    branches:
+      - audit/seo-crawl-20261028
+    paths:
+      - .github/workflows/site-smoke.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  smoke:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Test public pages and catalog read-only
+        run: node scripts/site-smoke.mjs
+      - name: Summarize
+        if: always()
+        run: |
+          if test -f site-smoke.md; then cat site-smoke.md >> "$GITHUB_STEP_SUMMARY"; fi
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: precision-atv-site-smoke
+          path: |
+            site-smoke.json
+            site-smoke.md
+          if-no-files-found: warn
