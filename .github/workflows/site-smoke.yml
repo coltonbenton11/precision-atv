@@ -29,3 +29,5 @@ jobs:
             site-smoke.json
             site-smoke.md
           if-no-files-found: warn
+
+# Recheck old Browse Models redirect after adding Shopify URL redirect
