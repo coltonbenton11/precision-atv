@@ -29,3 +29,5 @@ jobs:
             seo-focus.md
             seo-focus.json
           if-no-files-found: warn
+
+# Rerun verification following published blog-title cleanup
