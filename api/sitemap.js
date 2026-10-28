@@ -6,13 +6,13 @@ export default async function handler(req,res){
  const raw=process.env.SHOPIFY_STORE_DOMAIN||'';const domain=raw.replace(/^https?:\/\//,'').replace(/\/$/,'');const token=process.env.SHOPIFY_STOREFRONT_TOKEN||process.env.SHOPIFY_STOREFRONT_ACCESS_TOKEN||process.env.SHOPIFY_STOREFRONT_PUBLIC_ACCESS_TOKEN;
  const staticUrls=[
   {loc:BASE+'/',priority:'1.0',changefreq:'weekly'},
-  {loc:BASE+'/shop',priority:'0.9',changefreq:'daily'},
-  {loc:BASE+'/engines/polaris',priority:'0.9',changefreq:'weekly'},
-  {loc:BASE+'/engines/can-am',priority:'0.9',changefreq:'weekly'},
-  {loc:BASE+'/rebuild-kits-parts',priority:'0.9',changefreq:'weekly'},
-  {loc:BASE+'/services',priority:'0.9',changefreq:'monthly'},
-  {loc:BASE+'/about',priority:'0.7',changefreq:'monthly'},
-  {loc:BASE+'/contact',priority:'0.7',changefreq:'monthly'}
+  {loc:BASE+'/collections/all',priority:'0.9',changefreq:'daily'},
+  {loc:BASE+'/collections/engine',priority:'0.9',changefreq:'weekly'},
+  {loc:BASE+'/collections/canam',priority:'0.9',changefreq:'weekly'},
+  {loc:BASE+'/collections/piston-kits-components',priority:'0.9',changefreq:'weekly'},
+  {loc:BASE+'/pages/dyno-tune',priority:'0.9',changefreq:'monthly'},
+  {loc:BASE+'/pages/about-us-1',priority:'0.7',changefreq:'monthly'},
+  {loc:BASE+'/pages/contact',priority:'0.7',changefreq:'monthly'}
  ];
  let products=[],collections=[];
  if(domain&&token){
