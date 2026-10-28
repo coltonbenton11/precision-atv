@@ -1,0 +1,31 @@
+name: Precision ATV priority SEO verification
+on:
+  push:
+    branches:
+      - audit/seo-crawl-20261028
+    paths:
+      - .github/workflows/seo-focus.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Slowly verify highest-value pages
+        run: node scripts/seo-focus.mjs
+      - name: Show findings
+        if: always()
+        run: |
+          if test -f seo-focus.md; then cat seo-focus.md >> "$GITHUB_STEP_SUMMARY"; fi
+      - name: Save verification
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: precision-atv-priority-seo
+          path: |
+            seo-focus.md
+            seo-focus.json
+          if-no-files-found: warn
