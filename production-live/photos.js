@@ -90,7 +90,7 @@ PP.mountJobPhotos = async j => {
       const meta=PP.photoEsc(by+' · '+new Date(p.created_at).toLocaleString());
       return `<div class="task-photo">${url?`<a href="${PP.photoEsc(url)}" target="_blank" rel="noopener noreferrer" title="View full photo"><img src="${PP.photoEsc(url)}" loading="lazy" alt="${PP.photoEsc(p.task_label)}"></a>`:'<span class="muted">Image unavailable</span>'}<small title="${meta}">${meta}</small></div>`;
     };
-    const current=PP.photoChecksFor(j.stage);
+    const current=j.archivedAt?[]:PP.photoChecksFor(j.stage);
     const checklist=current.map(task=>{
       const imgs=photos.map((p,i)=>({p,i})).filter(x=>x.p.stage===j.stage&&x.p.task_key===task.key);
       const required=task.required;
@@ -103,7 +103,7 @@ PP.mountJobPhotos = async j => {
     }).join('');
     const history=photos.map((p,i)=>({p,i})).filter(x=>x.p.stage!==j.stage);
     const oldHtml=history.length?`<details class="photo-history"><summary>Earlier-stage photos (${history.length})</summary>${history.map(x=>`<div class="photo-history-row"><b>${PP.photoEsc(x.p.stage)} · ${PP.photoEsc(x.p.task_label)}</b><div class="task-photo-grid">${photoHtml(x.p,x.i)}</div></div>`).join('')}</details>`:'';
-    el.innerHTML=`<h3>Task photos</h3><p class="muted">Each image is saved to this job and its specific checklist task. Add a required photo before completing the stage.</p>${checklist}<p class="muted photo-status" aria-live="polite"></p>${oldHtml}`;
+    el.innerHTML=`<h3>Task photos</h3><p class="muted">${j.archivedAt?'Archived evidence: photos are available for review and cannot be changed here.':'Each image is saved to this job and its specific checklist task. Add a required photo before completing the stage.'}</p>${checklist}<p class="muted photo-status" aria-live="polite"></p>${oldHtml}`;
     el.querySelectorAll('.photo-input').forEach(input=>{
       input.addEventListener('change',async()=>{
         const file=input.files?.[0];
