@@ -101,8 +101,8 @@ PP.mountJobPhotos = async j => {
         <label class="btn photo-add">Take photo<input class="photo-input" type="file" accept="image/*" capture="environment" data-photo-task="${PP.photoEsc(task.key)}" data-photo-stage="${PP.photoEsc(j.stage)}" data-photo-label="${PP.photoEsc(task.label)}" hidden></label> <label class="btn photo-add">Choose photo<input class="photo-input" type="file" accept="image/jpeg,image/png,image/webp" data-photo-task="${PP.photoEsc(task.key)}" data-photo-stage="${PP.photoEsc(j.stage)}" data-photo-label="${PP.photoEsc(task.label)}" hidden></label>
       </div>`;
     }).join('');
-    const history=photos.map((p,i)=>({p,i})).filter(x=>x.p.stage!==j.stage);
-    const oldHtml=history.length?`<details class="photo-history"><summary>Earlier-stage photos (${history.length})</summary>${history.map(x=>`<div class="photo-history-row"><b>${PP.photoEsc(x.p.stage)} · ${PP.photoEsc(x.p.task_label)}</b><div class="task-photo-grid">${photoHtml(x.p,x.i)}</div></div>`).join('')}</details>`:'';
+    const history=photos.map((p,i)=>({p,i})).filter(x=>!!j.archivedAt||x.p.stage!==j.stage);
+    const oldHtml=history.length?`<details class="photo-history"><summary>${j.archivedAt?'All saved job photos':'Earlier-stage photos'} (${history.length})</summary>${history.map(x=>`<div class="photo-history-row"><b>${PP.photoEsc(x.p.stage)} · ${PP.photoEsc(x.p.task_label)}</b><div class="task-photo-grid">${photoHtml(x.p,x.i)}</div></div>`).join('')}</details>`:'';
     el.innerHTML=`<h3>Task photos</h3><p class="muted">${j.archivedAt?'Archived evidence: photos are available for review and cannot be changed here.':'Each image is saved to this job and its specific checklist task. Add a required photo before completing the stage.'}</p>${checklist}<p class="muted photo-status" aria-live="polite"></p>${oldHtml}`;
     el.querySelectorAll('.photo-input').forEach(input=>{
       input.addEventListener('change',async()=>{
