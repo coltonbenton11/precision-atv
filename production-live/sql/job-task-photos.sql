@@ -65,7 +65,7 @@ for insert to authenticated with check (
   and private.is_active_staff()
   and split_part(name,'/',1) <> ''
   and split_part(name,'/',2) ~ '^[a-z0-9-]+$'
-  and split_part(name,'/',3) ~ '^[0-9a-f-]+\\.(jpg|png|webp)$'
+  and split_part(name,'/',3) ~ '^[0-9a-f-]+\.(jpg|png|webp)$'
   and split_part(name,'/',4) = ''
   and exists (
     select 1 from public.app_state s
