@@ -92,7 +92,7 @@ PP.mountJobPhotos = async j => {
         <div class="photo-task-title"><strong>${PP.photoEsc(task.label)}</strong>
           <span class="badge ${imgs.length?'green':required?'amber':''}">${imgs.length?'✓ '+imgs.length+' saved':required?'Photo required':'Optional'}</span></div>
         <div class="task-photo-grid">${imgs.map(x=>photoHtml(x.p,x.i)).join('')}</div>
-        <label class="btn photo-add">+ Add photo<input class="photo-input" type="file" accept="image/jpeg,image/png,image/webp" data-photo-task="${PP.photoEsc(task.key)}" data-photo-stage="${PP.photoEsc(j.stage)}" data-photo-label="${PP.photoEsc(task.label)}" hidden></label>
+        <label class="btn photo-add">Take photo<input class="photo-input" type="file" accept="image/*" capture="environment" data-photo-task="${PP.photoEsc(task.key)}" data-photo-stage="${PP.photoEsc(j.stage)}" data-photo-label="${PP.photoEsc(task.label)}" hidden></label> <label class="btn photo-add">Choose photo<input class="photo-input" type="file" accept="image/jpeg,image/png,image/webp" data-photo-task="${PP.photoEsc(task.key)}" data-photo-stage="${PP.photoEsc(j.stage)}" data-photo-label="${PP.photoEsc(task.label)}" hidden></label>
       </div>`;
     }).join('');
     const history=photos.map((p,i)=>({p,i})).filter(x=>x.p.stage!==j.stage);
