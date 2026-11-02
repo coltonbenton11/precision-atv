@@ -37,7 +37,7 @@ PP.view="schedule";PP.list="customer";PP.toast=t=>{let e=document.querySelector(
   document.onkeydown=e=>{if(e.key==="Escape"&&!document.querySelector("#drawer").hidden)close()};
   document.querySelector("[data-stage-change]")?.addEventListener("change",async e=>{
     let old=j.stage,next=e.target.value;if(old===next)return;
-    if(PP.STAGES.indexOf(next)>PP.STAGES.indexOf(old)&&!(await PP.requireStagePhotos(j))){e.target.value=old;return;}
+    if(PP.STAGES.indexOf(next)>PP.STAGES.indexOf(old)&&!(await PP.requireAdvancePhotos(j,next))){e.target.value=old;return;}
     j.stage=next;j.stageEnteredAt=new Date().toISOString();j.awaitingApproval=false;j.pendingNext="";
     j.events=j.events||[];j.events.push({time:new Date().toISOString(),text:"Stage changed: "+old+" → "+next,by:PP.profile.display_name});
     PP.stageNotify(j,old,next);PP.save();PP.render();PP.openJob(j.id);PP.toast("Stage updated");
