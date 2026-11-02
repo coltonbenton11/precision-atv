@@ -21,10 +21,10 @@ PP.PHOTO_CHECKS = {
     {key:'parts-staged',label:'Parts pulled and staged for assembly',required:true}
   ],
   'Mark': [
-    {key:'assembly-complete',label:'Completed engine assembly',required:true}
+    {key:'assembly-complete',label:'Completed engine assembly',required:false}
   ],
   'Steven': [
-    {key:'assembly-complete',label:'Completed engine assembly',required:true}
+    {key:'assembly-complete',label:'Completed engine assembly',required:false}
   ],
   'Test': [
     {key:'test-evidence',label:'Engine on test stand / test results',required:true}
@@ -43,28 +43,34 @@ PP.photoChecksFor = stage => [
   ...(PP.PHOTO_CHECKS[stage] || []),
   {key:'additional-photos',label:'Additional photos for this stage',required:false}
 ];
-PP.photoMissing = async j => {
-  const required = PP.photoChecksFor(j.stage).filter(t=>t.required);
-  if (!required.length) return [];
-  const {data,error} = await PP.sb.from('job_task_photos')
-    .select('task_key').eq('job_id',j.id).eq('stage',j.stage)
-    .in('task_key',required.map(t=>t.key));
-  if (error) throw error;
-  const done = new Set((data||[]).map(p=>p.task_key));
-  return required.filter(t=>!done.has(t.key)).map(t=>t.label);
+PP.photoMissing = async (j,nextStage) => {
+  const start=PP.STAGES.indexOf(j.stage);
+  const end=PP.STAGES.indexOf(nextStage);
+  if(start<0||end<=start)return [];
+  const steps=PP.STAGES.slice(start,end);
+  const needed=steps.flatMap(stage=>PP.photoChecksFor(stage)
+    .filter(t=>t.required).map(t=>({...t,stage})));
+  if(!needed.length)return [];
+  const {data,error}=await PP.sb.from('job_task_photos')
+    .select('stage,task_key').eq('job_id',j.id).in('stage',steps);
+  if(error)throw error;
+  const saved=new Set((data||[]).map(p=>p.stage+':'+p.task_key));
+  return needed.filter(t=>!saved.has(t.stage+':'+t.key))
+    .map(t=>t.stage+' — '+t.label);
 };
-PP.requireStagePhotos = async j => {
+PP.requireAdvancePhotos = async (j,nextStage) => {
   try {
-    const missing = await PP.photoMissing(j);
-    if (!missing.length) return true;
+    const missing=await PP.photoMissing(j,nextStage);
+    if(!missing.length)return true;
     PP.toast('Required photos missing: '+missing.join(', '));
     return false;
-  } catch(err) {
+  }catch(err){
     console.error('Could not verify required job photos',err);
     PP.toast('Photo checks unavailable. Stage not advanced.');
     return false;
   }
 };
+PP.requireStagePhotos = j => PP.requireAdvancePhotos(j,PP.nextStage(j.stage));
 PP.photoEsc = v => PP.esc(v);
 PP.mountJobPhotos = async j => {
   const el=document.querySelector('#jobPhotoChecks');
