@@ -75,7 +75,7 @@ for insert to authenticated with check (
   private.is_active_staff() and completed_by=(select auth.uid())
   and exists (
     select 1 from public.production_checklist_templates t
-    where t.stage=stage and t.task_key=task_key and t.active
+    where t.stage=public.production_checklist_completions.stage and t.task_key=public.production_checklist_completions.task_key and t.active
   )
   and exists (
     select 1 from public.app_state a, jsonb_array_elements(coalesce(a.data->'jobs','[]'::jsonb)) j
@@ -96,7 +96,7 @@ for insert to authenticated with check (
     task_key='additional-photos'
     or exists (
       select 1 from public.production_checklist_templates t
-      where t.stage=stage and t.task_key=task_key and t.active
+      where t.stage=public.production_checklist_completions.stage and t.task_key=public.production_checklist_completions.task_key and t.active
     )
   )
   and exists (
