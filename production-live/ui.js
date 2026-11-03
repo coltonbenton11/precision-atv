@@ -36,6 +36,7 @@ PP.render = () => {
   document.querySelector('#content').innerHTML = fn ? fn() : '';
   PP.bindView();
   PP.bindChecklistEditor?.();
+  PP.bindMachineTasks?.();
 };
 
 PP.jobTable = (jobs) => {
