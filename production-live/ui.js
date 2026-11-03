@@ -175,7 +175,7 @@ PP.view_calendar = () => {
   const visible=unscheduled.filter(j=>([j.invoice,j.customer,j.engine,j.stage].join(' ').toLowerCase()).includes(query));
   const today=iso(new Date());
   const monthLabel=start.toLocaleDateString(undefined,{month:'long',day:'numeric'})+' – '+end.toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'});
-  const card=(j,queue=false)=>`<div class="planner-job ${j.jobType==='Warranty'?'warranty':''} ${j.blocked?'blocked':''}" draggable="${canSchedule}" data-drag-job="${PP.esc(j.id)}" data-job="${PP.esc(j.id)}" ${queue?`data-queue-job data-queue-search="${PP.esc([j.invoice,j.customer,j.engine,j.stage].join(' ').toLowerCase())}"`:''}>
+  const card=(j,queue=false)=>`<div class="planner-job ${j.jobType==='Warranty'?'warranty':''} ${j.blocked?'blocked':''}" draggable="${canSchedule}" data-drag-job="${PP.esc(j.id)}" data-job="${PP.esc(j.id)}" ${queue?`data-queue-job data-queue-search="${PP.esc([j.invoice,j.customer,j.engine,j.stage].join(' ').toLowerCase())}" ${query&&!([j.invoice,j.customer,j.engine,j.stage].join(' ').toLowerCase().includes(query))?'hidden':''}`:''}>
       <div class="planner-job-top"><strong>${PP.esc(j.invoice||'No invoice')}</strong><span>${PP.esc(j.jobType)}</span></div>
       <b>${PP.esc(j.customer)}</b>
       <small>${PP.esc(j.engine)}</small>
@@ -195,7 +195,8 @@ PP.view_calendar = () => {
         <div class="card-head"><div><h3>Unscheduled jobs</h3><p>Drag to a day, or choose a date and click Schedule.</p></div><span class="badge">${unscheduled.length}</span></div>
         <div class="planner-queue-search"><label for="plannerJobSearch">Find an engine</label><input id="plannerJobSearch" type="search" data-cal-search placeholder="Invoice, customer, engine..." value="${PP.esc(PP.calendarSearch)}"><small><span data-queue-visible>${visible.length}</span> of ${unscheduled.length} jobs</small></div>
         <div class="planner-queue-scroll">
-          ${visible.length?visible.map(j=>card(j,true)).join(''):'<div class="empty">No unscheduled jobs match.</div>'}
+          ${unscheduled.length?unscheduled.map(j=>card(j,true)).join(''):'<div class="empty">Everything is scheduled.</div>'}
+          ${unscheduled.length?`<div class="empty" data-cal-no-matches ${visible.length?'hidden':''}>No matching unscheduled jobs.</div>`:''}
         </div>
         <div class="planner-drop-hint">Drop a scheduled job here to remove its date.</div>
       </section>
@@ -477,6 +478,8 @@ PP.bindView = () => {
     let shown=0;
     cards.forEach(x=>{x.hidden=!x.dataset.queueSearch.includes(query);if(!x.hidden)shown++});
     document.querySelector('[data-queue-visible]').textContent=String(shown);
+    const empty=document.querySelector('[data-cal-no-matches]');
+    if(empty)empty.hidden=shown>0;
   });
   document.querySelectorAll('[data-cal-book]').forEach(b=>b.addEventListener('click',e=>{
     e.stopPropagation();
