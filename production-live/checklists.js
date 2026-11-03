@@ -88,7 +88,7 @@ PP.view_checklists=()=>{
       '<button class="btn" data-ct-save="'+PP.esc(t.id)+'">Save</button>'+
     '</div>').join('');
   return '<div class="card checklist-manager">'+
-    '<div class="card-head"><div><h2>Production Checklists</h2><p>Create tasks for each stage. Required tasks and photos must be completed before advancing.</p></div></div>'+
+    '<div class="card-head"><div><h2>Production Checklists</h2><p>Create tasks for each stage. Required tasks and photos must be completed before advancing. Turning on Required applies to existing jobs at that stage, too.</p></div></div>'+
     (PP.checklistError?'<div class="empty">Checklist storage unavailable: '+PP.esc(PP.checklistError)+'</div>':'')+
     '<div class="checklist-manager-body">'+
       '<label class="checklist-stage-picker">Production stage<select data-ct-stage>'+stageSelect+'</select></label>'+
@@ -110,13 +110,13 @@ PP.bindChecklistEditor=()=>{
   document.querySelector('[data-ct-form]')?.addEventListener('submit',async e=>{
     e.preventDefault();
     const form=e.currentTarget,button=form.querySelector('button[type=submit]');
-    const label=form.elements.label.value.trim(),required=form.elements.required.checked||form.elements.photo.checked;
+    const label=form.querySelector('[name="label"]').value.trim(),required=form.querySelector('[name="required"]').checked||form.querySelector('[name="photo"]').checked;
     if(!label)return;
     button.disabled=true;
     const {error}=await PP.sb.from('production_checklist_templates').insert({
       stage:PP.checklistSelectedStage,task_key:crypto.randomUUID(),label,
       position:PP.checklistTemplates.filter(t=>t.stage===PP.checklistSelectedStage).length+1,
-      is_required:required,photo_required:form.elements.photo.checked,active:true,created_by:PP.user.id
+      is_required:required,photo_required:form.querySelector('[name="photo"]').checked,active:true,created_by:PP.user.id
     });
     button.disabled=false;
     if(error){console.error(error);return PP.toast('Could not create checklist task: '+error.message);}
