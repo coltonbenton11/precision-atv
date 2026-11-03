@@ -47,3 +47,38 @@
 .checklist-new-task>label:first-child{flex:1 1 240px}
 @media(max-width:900px){.checklist-template-row{grid-template-columns:minmax(0,1fr) auto;align-items:center}.checklist-template-row>label:first-child{grid-column:1/-1}}
 @media(max-width:600px){.task-photo,.task-photo img{width:92px}.task-photo img{height:78px}}
+
+/* Machinist job-task schedule */
+.machinist-stats{grid-template-columns:repeat(4,minmax(130px,1fr))}
+.machinist-layout{display:grid;grid-template-columns:minmax(295px,345px) minmax(0,1fr);gap:14px;align-items:start}
+.machinist-layout>.card{min-width:0}
+.machinist-create .card-head h3{font-size:17px}
+.machinist-create .card-head p,.machinist-queue .card-head p{line-height:1.4}
+.machinist-form{display:grid;gap:12px;padding:16px;grid-template-columns:1fr 1fr}
+.machinist-form>label{min-width:0;display:grid;gap:5px;font-size:11px;font-weight:700;color:#475569}
+.machinist-form>label.wide{grid-column:1/-1}
+.machinist-form input,.machinist-form select,.machinist-form textarea,.machinist-search input{width:100%;min-width:0;max-width:100%;border:1px solid #d0d9df;border-radius:8px;background:white;color:#151c19;padding:9px;font:inherit}
+.machinist-form textarea{resize:vertical;line-height:1.45}
+.machinist-form-actions{grid-column:1/-1;display:flex;gap:8px;flex-wrap:wrap}
+.machinist-form-feedback{grid-column:1/-1;margin:0}
+.required-star{color:#b4372d}
+.machinist-filters{display:flex;gap:6px;flex-wrap:wrap;padding:12px;border-bottom:1px solid #edf0f2}
+.machinist-filters .btn{font-size:11px;padding:7px 9px}
+.machinist-filters .btn.active{color:white;background:#151a17;border-color:#151a17}
+.machinist-search{padding:0 12px 12px}
+.machinist-task-list{padding:0 12px 12px;display:grid;gap:10px;max-height:720px;overflow-y:auto}
+.machinist-task{padding:13px;border:1px solid #dce4e7;border-radius:10px;background:#fff}
+.machinist-task.is-overdue{border-left:4px solid #c45838}
+.machinist-task-top{display:flex;justify-content:space-between;align-items:start;gap:8px}
+.machinist-task-top b{display:block;font-size:13px}
+.machinist-task-top p{margin:4px 0 0;font-size:11px;line-height:1.4}
+.machinist-task-meta{display:flex;gap:6px 14px;flex-wrap:wrap;margin:10px 0;font-size:11px;color:#52606b}
+.machinist-details{margin:10px 0;padding:9px;border-radius:7px;background:#f5f7f8;white-space:pre-wrap;font-size:12px;line-height:1.45}
+.machinist-blocker{padding:9px;border-radius:8px;background:#fff4e3;color:#815320;margin:10px 0}
+.machinist-task-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px}
+.machinist-task-actions .btn{font-size:11px;padding:8px 10px}
+.machinist-stock{padding:12px 16px}
+.machinist-stock summary{cursor:pointer;font-weight:700}
+@media(max-width:1150px){.machinist-layout{grid-template-columns:minmax(265px,315px) minmax(0,1fr)}}
+@media(max-width:900px){.machinist-layout{grid-template-columns:minmax(0,1fr)}.machinist-task-list{max-height:none}.machinist-stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:520px){.machinist-form{grid-template-columns:1fr}.machinist-form>label{grid-column:1/-1}.machinist-task-top{flex-wrap:wrap}}
