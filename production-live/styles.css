@@ -24,3 +24,26 @@
 .planner-layout .planner-empty{padding:12px 4px;font-size:10px}
 @media(max-width:1170px){.planner-layout{grid-template-columns:minmax(255px,275px) minmax(0,1fr)}}
 @media(max-width:850px){.planner-layout{grid-template-columns:minmax(0,1fr)}.planner-queue-scroll{max-height:300px}.planner-layout .planner-week{grid-template-columns:repeat(7,minmax(125px,1fr))}}
+
+/* Task checklist and permanent photo evidence */
+.photo-task{border:1px solid #dce3e8;border-radius:12px;padding:12px;margin:12px 0}
+.photo-task-title{display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:9px}
+.task-photo-grid{display:flex;flex-wrap:wrap;gap:10px;margin:7px 0}
+.task-photo{width:110px;overflow-wrap:anywhere}
+.task-photo a{display:block;border:1px solid #cbd5e1;border-radius:8px;overflow:hidden}
+.task-photo img{display:block;width:110px;height:90px;object-fit:cover}
+.task-photo small{display:block;color:#64748b;font-size:10px;line-height:1.35;margin-top:4px}
+.photo-add{display:inline-flex;cursor:pointer;margin-top:8px;vertical-align:middle}
+.photo-history{margin-top:16px}.photo-history summary{cursor:pointer;font-weight:700}
+.photo-history-row{margin:12px 0}.photo-status{min-height:1.25em;margin:9px 0}
+.checklist-manager-body{padding:16px;display:grid;gap:12px}
+.checklist-stage-picker{display:grid;gap:6px;max-width:320px;font-size:12px;font-weight:700}
+.checklist-stage-picker select,.checklist-new-task input[type=text],.checklist-template-row input:not([type=checkbox]){border:1px solid #d3dbe1;border-radius:8px;padding:9px;font:inherit;width:100%}
+.checklist-template-row{display:grid;grid-template-columns:minmax(185px,1fr) repeat(3,max-content) auto;gap:12px;align-items:end;border:1px solid #e3e7eb;border-radius:10px;padding:12px}
+.checklist-template-row>label:first-child,.checklist-new-task>label:first-child{display:grid;gap:5px;font-size:12px}
+.ct-option{display:flex;align-items:center;gap:6px;font-size:12px;white-space:nowrap;min-height:38px}
+.ct-option input{accent-color:#1f7a43}
+.checklist-new-task{display:flex;align-items:end;gap:12px;flex-wrap:wrap;border-top:1px solid #e5e7eb;padding-top:16px}
+.checklist-new-task>label:first-child{flex:1 1 240px}
+@media(max-width:900px){.checklist-template-row{grid-template-columns:minmax(0,1fr) auto;align-items:center}.checklist-template-row>label:first-child{grid-column:1/-1}}
+@media(max-width:600px){.task-photo,.task-photo img{width:92px}.task-photo img{height:78px}}
