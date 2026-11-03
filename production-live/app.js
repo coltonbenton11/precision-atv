@@ -23,7 +23,7 @@ PP.view="schedule";PP.list="customer";PP.toast=t=>{let e=document.querySelector(
     ${!archived&&!manager&&!j.blocked&&!j.awaitingApproval&&j.stage!=="Complete"?`<button class="btn primary" data-complete="${j.id}">Complete stage</button><button class="btn danger" data-block="${j.id}">Blocked</button>`:""}
     ${manager&&!archived&&j.awaitingApproval?`<button class="btn primary" data-approve="${j.id}">Approve & advance</button>`:""}
     ${manager&&!archived&&j.blocked?`<button class="btn" data-unblock="${j.id}">Resolve blocker</button>`:""}
-    ${manager&&!archived?`<button class="btn" data-machining-for-job="${j.id}">+ Machining task</button><button class="btn primary" data-sms="${j.id}">Text customer</button><button class="btn" data-email="${j.id}">Queue email update</button><button class="btn" data-archive-order="${j.id}">Archive job</button>`:""}
+    ${manager&&!archived?`${j.stage!=="Complete"?`<button class="btn" data-machining-for-job="${j.id}">+ Machining task</button>`:""}<button class="btn primary" data-sms="${j.id}">Text customer</button><button class="btn" data-email="${j.id}">Queue email update</button><button class="btn" data-archive-order="${j.id}">Archive job</button>`:""}
     ${manager&&archived?`<button class="btn" data-restore-order="${j.id}">Restore to production</button>`:""}
   </div></div>
   <div class="drawer-section"><h3>Text Messages</h3>${sms.length?sms.map(x=>`<p><b>${PP.esc(x.status)} · ${PP.esc(x.stage||"Manual")}</b><br><span>${PP.esc(x.body||"")}</span><br><span class="muted">${new Date(x.sentAt||x.createdAt).toLocaleString()}${x.error?" · "+PP.esc(x.error):""}</span></p>`).join(""):`<p class="muted">No texts sent for this job yet.</p>`}</div>
