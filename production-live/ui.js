@@ -1,13 +1,13 @@
 PP.esc = (v) => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 PP.progress = (j) => Math.round(PP.STAGES.indexOf(j.stage) / (PP.STAGES.length - 1) * 100);
 PP.sortedJobs = (cls) => PP.state.jobs
-  .filter(j => j.productionClass === cls)
+  .filter(j => !j.archivedAt && j.productionClass === cls)
   .sort((a,b) => {
     const aw = a.jobType === 'Warranty' ? 0 : 1;
     const bw = b.jobType === 'Warranty' ? 0 : 1;
     return aw - bw || PP.invoiceNo(a.invoice) - PP.invoiceNo(b.invoice);
   });
-PP.badge = (j) => j.jobType === 'Warranty'
+PP.badge = (j) => j.archivedAt ? '<span class="badge">ARCHIVED</span>' : j.jobType === 'Warranty'
   ? '<span class="badge red">WARRANTY</span>'
   : j.blocked ? '<span class="badge amber">BLOCKED</span>' : '<span class="badge green">READY</span>';
 PP.latestUpdate = (j) => {
@@ -27,14 +27,15 @@ PP.render = () => {
   document.body.className = 'role-' + PP.profile.role;
   document.querySelector('#whoName').textContent = PP.profile.display_name;
   document.querySelector('#whoRole').textContent = PP.profile.role;
-  document.querySelector('#approvalCount').textContent = PP.state.jobs.filter(j => j.awaitingApproval && j.stage !== 'Complete').length;
+  document.querySelector('#approvalCount').textContent = PP.state.jobs.filter(j => !j.archivedAt && j.awaitingApproval && j.stage !== 'Complete').length;
   document.querySelector('#emailCount').textContent = PP.state.emailOutbox.length;
   document.querySelectorAll('#nav button').forEach(b => b.classList.toggle('active', b.dataset.view === PP.view));
-  const titles = {schedule:'Production Schedule',calendar:'Calendar',materials:'Inventory & Machining',machinist:'Machinist Schedule',notifications:'Customer Updates',mywork:'My Work',blocked:'Blocked',approvals:'Approvals',completed:'Completed',team:'Team'};
+  const titles = {schedule:'Production Schedule',calendar:'Calendar',materials:'Inventory & Machining',machinist:'Machinist Schedule',notifications:'Customer Updates',mywork:'My Work',blocked:'Blocked',approvals:'Approvals',completed:'Completed',archived:'Archived Jobs',checklists:'Checklists',team:'Team'};
   document.querySelector('#title').textContent = titles[PP.view] || 'Precision Production';
   const fn = PP['view_' + PP.view];
   document.querySelector('#content').innerHTML = fn ? fn() : '';
   PP.bindView();
+  PP.bindChecklistEditor?.();
 };
 
 PP.jobTable = (jobs) => {
@@ -47,7 +48,7 @@ PP.jobTable = (jobs) => {
       <td>${PP.latestUpdateCell(j)}</td>
       <td>${(j.sourceTags||[]).length ? (j.sourceTags||[]).map(t=>`<span class="badge">${PP.esc(t)}</span>`).join(' ') : '<span class="muted">—</span>'}</td>
       <td>${j.sourceStatus ? `<span class="badge">${PP.esc(j.sourceStatus)}</span>` : '<span class="muted">—</span>'}</td>
-      <td>${canFlag ? `<select class="type-inline" data-jobtype="${j.id}">${PP.TYPES.map(t=>`<option ${t===j.jobType?'selected':''}>${PP.esc(t)}</option>`).join('')}</select>` : PP.esc(j.jobType)}</td>
+      <td>${canFlag&&!j.archivedAt ? `<select class="type-inline" data-jobtype="${j.id}">${PP.TYPES.map(t=>`<option ${t===j.jobType?'selected':''}>${PP.esc(t)}</option>`).join('')}</select>` : PP.esc(j.jobType)}</td>
       <td>${PP.esc(j.engine)}</td>
       <td>${PP.esc(j.stage)}<div class="progress"><i style="width:${PP.progress(j)}%"></i></div></td>
       <td>${j.plannedDate || '—'}</td><td>${PP.badge(j)}</td>
@@ -128,7 +129,7 @@ PP.view_schedule = () => {
 PP.calendarScheduleJob = (id, date) => {
   if (!['owner','manager'].includes(PP.profile.role)) return PP.toast('Manager access required to schedule');
   const j=PP.state.jobs.find(x=>x.id===id);
-  if (!j || j.stage==='Complete') return PP.toast('Job is not available for scheduling');
+  if (!j || j.stage==='Complete'||j.archivedAt) return PP.toast('Job is not available for scheduling');
   if (date && !/^\d{4}-\d{2}-\d{2}$/.test(date)) return PP.toast('Select a valid date');
   if (date) {
     const d=new Date(date+'T12:00:00');
@@ -168,7 +169,7 @@ PP.view_calendar = () => {
   start.setDate(start.getDate()+delta+(PP.calendarOffset*7));
   const days=Array.from({length:7},(_,i)=>{const d=new Date(start);d.setDate(start.getDate()+i);return d});
   const end=days[6];
-  const active=PP.state.jobs.filter(j=>j.stage!=='Complete' && (cls==='all'||j.productionClass===cls));
+  const active=PP.state.jobs.filter(j=>!j.archivedAt&&j.stage!=='Complete' && (cls==='all'||j.productionClass===cls));
   const unscheduled=active.filter(j=>!j.plannedDate).sort((a,b)=>
     (a.jobType==='Warranty'?0:1)-(b.jobType==='Warranty'?0:1) || PP.invoiceNo(a.invoice)-PP.invoiceNo(b.invoice));
   const query=PP.calendarSearch.trim().toLowerCase();
@@ -214,7 +215,7 @@ PP.view_calendar = () => {
 };
 
 PP.plan = (f) => {
-  const active = PP.state.jobs.filter(j => j.stage !== 'Complete' && j.productionClass === 'customer' && PP.classify(j.engine) === f.id).length;
+  const active = PP.state.jobs.filter(j => !j.archivedAt && j.stage !== 'Complete' && j.productionClass === 'customer' && PP.classify(j.engine) === f.id).length;
   const override = Number(PP.state.queueOverrides[f.id] || 0);
   const queue = Math.max(active, override);
   const forecast = Math.ceil(f.hist / 365 * Number(PP.state.forecastHorizon || 60));
@@ -446,15 +447,16 @@ PP.view_notifications = () => {
   </div>
   <div class="card"><div class="card-head"><div><h2>Email outbox</h2><p>Delivery provider is not connected yet; messages are queued here safely.</p></div></div>${out.length ? out.map(e=>{const j=PP.state.jobs.find(x=>x.id===e.jobId);return `<div class="email-row ${e.status==='Needs Review'?'review':''}"><b>${j?.invoice||''}</b><div><strong>${PP.esc(e.subject)}</strong><p>${PP.esc(e.body)}</p></div><span>${e.status}</span><button class="btn" data-email-cancel="${e.id}">Cancel</button></div>`}).join('') : '<div class="empty">Outbox is clear.</div>'}</div>`;
 };
-PP.view_mywork = () => PP.jobTable(PP.state.jobs.filter(j=>j.stage!=='Complete'&&j.assigned===PP.profile.display_name));
-PP.view_blocked = () => PP.jobTable(PP.state.jobs.filter(j=>j.blocked&&j.stage!=='Complete'));
-PP.view_approvals = () => PP.jobTable(PP.state.jobs.filter(j=>j.awaitingApproval&&j.stage!=='Complete'));
-PP.view_completed = () => PP.jobTable(PP.state.jobs.filter(j=>j.stage==='Complete').sort((a,b)=>PP.invoiceNo(b.invoice)-PP.invoiceNo(a.invoice)));
+PP.view_mywork = () => PP.jobTable(PP.state.jobs.filter(j=>!j.archivedAt&&j.stage!=='Complete'&&j.assigned===PP.profile.display_name));
+PP.view_blocked = () => PP.jobTable(PP.state.jobs.filter(j=>!j.archivedAt&&j.blocked&&j.stage!=='Complete'));
+PP.view_approvals = () => PP.jobTable(PP.state.jobs.filter(j=>!j.archivedAt&&j.awaitingApproval&&j.stage!=='Complete'));
+PP.view_completed = () => PP.jobTable(PP.state.jobs.filter(j=>!j.archivedAt&&j.stage==='Complete').sort((a,b)=>PP.invoiceNo(b.invoice)-PP.invoiceNo(a.invoice)));
+PP.view_archived = () => PP.jobTable(PP.state.jobs.filter(j=>!!j.archivedAt).sort((a,b)=>new Date(b.archivedAt)-new Date(a.archivedAt)));
 PP.view_team = () => `<div class="card"><div class="card-head"><div><h2>Team</h2><p>New signups remain inactive until the owner approves them.</p></div></div>${PP.team.map(p=>`<div class="team-row"><div><strong>${PP.esc(p.display_name)}</strong><small>${p.id===PP.user.id?'Your account':'Team account'}</small></div><select data-role="${p.id}" ${p.id===PP.user.id?'disabled':''}><option value="technician" ${p.role==='technician'?'selected':''}>Technician</option><option value="manager" ${p.role==='manager'?'selected':''}>Manager</option><option value="owner" ${p.role==='owner'?'selected':''}>Owner</option></select><label><input type="checkbox" data-active="${p.id}" ${p.active?'checked':''} ${p.id===PP.user.id?'disabled':''}> Active</label><button class="btn" data-team-save="${p.id}" ${p.id===PP.user.id?'disabled':''}>Save</button></div>`).join('')}</div>`;
 
 PP.bindView = () => {
   document.querySelectorAll('[data-job]').forEach(x=>x.onclick=e=>{if(e.target.closest('[data-jobtype], [data-cal-date], [data-cal-book]'))return;PP.openJob(x.dataset.job)});
-  document.querySelectorAll('[data-jobtype]').forEach(x=>x.onchange=e=>{e.stopPropagation();let j=PP.state.jobs.find(j=>j.id===x.dataset.jobtype);if(!j)return;j.jobType=x.value;if(x.value==='Stock / Internal')j.productionClass='patv';j.events=j.events||[];j.events.push({time:new Date().toISOString(),text:'Flag / type changed to '+x.value,by:PP.profile.display_name});PP.save();PP.render()});
+  document.querySelectorAll('[data-jobtype]').forEach(x=>x.onchange=e=>{e.stopPropagation();let j=PP.state.jobs.find(j=>j.id===x.dataset.jobtype);if(!j)return;if(j.archivedAt)return;j.jobType=x.value;if(x.value==='Stock / Internal')j.productionClass='patv';j.events=j.events||[];j.events.push({time:new Date().toISOString(),text:'Flag / type changed to '+x.value,by:PP.profile.display_name});PP.save();PP.render()});
   document.querySelectorAll('[data-list]').forEach(x=>x.onclick=()=>{PP.list=x.dataset.list;PP.render()});
   document.querySelectorAll('[data-schedule-mode]').forEach(x=>x.onclick=()=>{PP.scheduleMode=x.dataset.scheduleMode;PP.render()});
   document.querySelector('[data-schedule-sort]')?.addEventListener('change',e=>{PP.scheduleSort=e.target.value;PP.render()});
@@ -464,7 +466,7 @@ PP.bindView = () => {
   document.querySelectorAll('[data-stage-drop]').forEach(x=>{
     x.addEventListener('dragover',e=>{e.preventDefault();x.classList.add('dragover')});
     x.addEventListener('dragleave',()=>x.classList.remove('dragover'));
-    x.addEventListener('drop',e=>{e.preventDefault();x.classList.remove('dragover');let id=e.dataTransfer.getData('text/plain'),j=PP.state.jobs.find(j=>j.id===id);if(!j)return;let old=j.stage,next=x.dataset.stageDrop;if(old===next)return;j.stage=next;j.stageEnteredAt=new Date().toISOString();j.awaitingApproval=false;j.pendingNext='';j.events=j.events||[];j.events.push({time:new Date().toISOString(),text:'Stage changed: '+old+' → '+next,by:PP.profile.display_name});PP.stageNotify?.(j,old,next);PP.save();PP.render()});
+    x.addEventListener('drop',async e=>{e.preventDefault();x.classList.remove('dragover');if(!['owner','manager'].includes(PP.profile.role))return;let id=e.dataTransfer.getData('text/plain'),j=PP.state.jobs.find(j=>j.id===id);if(!j||j.archivedAt)return;let old=j.stage,next=x.dataset.stageDrop;if(old===next)return;if(PP.STAGES.indexOf(next)>PP.STAGES.indexOf(old)&&!(await PP.requireAdvancePhotos(j,next)))return;j.stage=next;j.stageEnteredAt=new Date().toISOString();j.awaitingApproval=false;j.pendingNext='';j.events=j.events||[];j.events.push({time:new Date().toISOString(),text:'Stage changed: '+old+' → '+next,by:PP.profile.display_name});PP.stageNotify?.(j,old,next);PP.save();PP.render()});
   });
   {const board=document.querySelector('[data-stage-board]'),bar=document.querySelector('[data-stage-scrollbar]');if(board&&bar){let lock=false;board.addEventListener('scroll',()=>{if(lock)return;lock=true;bar.scrollLeft=board.scrollLeft;requestAnimationFrame(()=>lock=false)});bar.addEventListener('scroll',()=>{if(lock)return;lock=true;board.scrollLeft=bar.scrollLeft;requestAnimationFrame(()=>lock=false)})}}
   document.querySelectorAll('[data-cal-class]').forEach(x=>x.onclick=()=>{PP.calendarClass=x.dataset.calClass;PP.render()});
