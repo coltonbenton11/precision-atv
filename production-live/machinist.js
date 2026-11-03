@@ -3,6 +3,7 @@ PP.machineTasks = [];
 PP.machineFilter = 'active';
 PP.machineSearch = '';
 PP.machineEditing = '';
+PP.machineDraftJobId = '';
 PP.machineLoadError = '';
 
 PP.machineToday = () => {
@@ -74,7 +75,7 @@ PP.view_machinist=()=>{
     <div class="card-head"><div><h3 data-mac-editor-title>Add machinist work</h3><p>Assign machining work to a customer engine or create an internal shop task.</p></div></div>
     <form data-mac-form class="machinist-form">
       <label class="wide">Find engine / work order<input type="search" data-mac-job-search placeholder="Search invoice, customer or engine"></label>
-      <label class="wide">Job<select name="jobId" data-mac-job-select>${PP.machineJobOptions()}</select></label>
+      <label class="wide">Job<select name="jobId" data-mac-job-select>${PP.machineJobOptions('',PP.machineDraftJobId)}</select></label>
       <label>Common task<select data-mac-preset><option value="">Choose or type your own</option><option>Bore / hone cylinder</option><option>Resurface cylinder head</option><option>Cut / install valve seats</option><option>Replace valve guides</option><option>Pressure test cylinder head</option><option>Clean / prep components</option><option>Inspect / measure components</option><option>Other machining work</option></select></label>
       <label>Work to perform <span class="required-star">*</span><input name="title" maxlength="180" required placeholder="e.g., Bore and hone cylinders"></label>
       <label>Scheduled date<input name="scheduledDate" type="date" required value="${today}"></label>
@@ -142,6 +143,7 @@ PP.view_machinist=()=>{
 };
 PP.machineClearForm=()=>{
   PP.machineEditing='';
+  PP.machineDraftJobId='';
   const form=document.querySelector('[data-mac-form]');
   if(!form)return;
   form.reset();
@@ -151,6 +153,15 @@ PP.machineClearForm=()=>{
   form.querySelector('[data-mac-save]').textContent='+ Add machining task';
   document.querySelector('[data-mac-editor-title]').textContent='Add machinist work';
   document.querySelector('[data-mac-feedback]').textContent='';
+};
+PP.machineOpenForJob=id=>{
+  if(!PP.machineIsManager())return PP.toast('Manager access required');
+  PP.machineDraftJobId=id;
+  PP.machineEditing='';
+  PP.view='machinist';
+  document.querySelector('#drawer').hidden=true;
+  PP.render();
+  document.querySelector('#machinistTaskEditor')?.scrollIntoView({behavior:'smooth',block:'start'});
 };
 PP.machineStartEdit=id=>{
   if(!PP.machineIsManager())return;
@@ -188,6 +199,7 @@ PP.machineSave=async form=>{
     if(r.error)throw r.error;
     await PP.loadMachineTasks();
     PP.machineEditing='';
+    PP.machineDraftJobId='';
     PP.render();
     PP.toast('Machining task saved');
   }catch(err){
