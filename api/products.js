@@ -1,3 +1,4 @@
+import {validUsdPrice,safeUsdAmount} from './_pricing.js';
 import { namuraFitment } from './_namuraFitment.js';
 const API_VERSION='2026-07';
 const SHOP='https://precisionatv-com.myshopify.com/cdn/shop/files/';
@@ -76,7 +77,7 @@ export default async function handler(req,res){
     return res.status(503).json({mode:'unavailable',error:'Shopify catalog is temporarily unavailable.',products:[],total:0,hasMore:false});
   }
 
-  const query=`query Products($first:Int!,$after:String){products(first:$first,after:$after,sortKey:BEST_SELLING){pageInfo{hasNextPage endCursor}nodes{id handle title productType vendor tags featuredImage{url altText} images(first:1){nodes{url altText}} media(first:1){nodes{previewImage{url altText}}} variants(first:10){nodes{id title availableForSale price{amount currencyCode}}}}}}`;
+  const query=`query Products($first:Int!,$after:String) @inContext(country: US){products(first:$first,after:$after,sortKey:BEST_SELLING){pageInfo{hasNextPage endCursor}nodes{id handle title productType vendor tags featuredImage{url altText} images(first:1){nodes{url altText}} media(first:1){nodes{previewImage{url altText}}} variants(first:10){nodes{id title availableForSale price{amount currencyCode}}}}}}`;
 
   try{
     const products=[];
@@ -103,8 +104,8 @@ export default async function handler(req,res){
         const namura=namuraFitment(p.title);
         products.push({
           id:p.id,handle:p.handle,title:p.title,productType:p.productType,vendor:p.vendor,tags,image,
-          variantId:v?.id||null,price:v?.price?.amount||0,currency:v?.price?.currencyCode||'USD',
-          available:!!v?.availableForSale,
+          variantId:v?.id||null,price:safeUsdAmount(v?.price),currency:v?.price?.currencyCode||'USD',
+          available:!!v?.availableForSale&&validUsdPrice(v?.price),
           searchText:[p.title,p.productType,p.vendor,...tags,namura?.part,namura?.models,namura?.spec].filter(Boolean).join(' ').toLowerCase()
         });
       }
@@ -115,7 +116,7 @@ export default async function handler(req,res){
       if(!wantAll)hasMore=false;
     }
 
-    res.setHeader('Cache-Control','public, s-maxage=60, stale-while-revalidate=300');
+    res.setHeader('Cache-Control','public, s-maxage=30, stale-while-revalidate=60');
     return res.status(200).json({mode:'shopify',products,total:products.length,hasMore});
   }catch(e){
     console.error('Shopify product feed unavailable', e);
