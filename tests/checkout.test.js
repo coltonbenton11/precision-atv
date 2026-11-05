@@ -12,7 +12,7 @@ function response(){
     json(v){this.body=v;return this}
   };
 }
-async function run(items,{warnings=[],missing=false}={}){
+async function run(items,{warnings=[],missing=false,badPrice=false,wrongCurrency=false,badTotal=false}={}){
   process.env.SHOPIFY_STORE_DOMAIN='example.myshopify.com';
   process.env.SHOPIFY_STOREFRONT_TOKEN='test-token';
   const req={method:'POST',body:{items}};
@@ -24,12 +24,12 @@ async function run(items,{warnings=[],missing=false}={}){
     let data;
     if(isLookup){
       data={nodes:body.variables.ids.map(id=>id===ENGINE?
-        {id,availableForSale:true,product:{title:'2020 Polaris RZR Remanufactured Engine',productType:'Engines',tags:[]}}:
-        {id,availableForSale:!missing,product:{title:'Piston Ring Set',productType:'Parts',tags:[]}})};
+        {id,availableForSale:true,price:{amount:badPrice?'0':'3200',currencyCode:wrongCurrency?'CAD':'USD'},product:{title:'2020 Polaris RZR Remanufactured Engine',productType:'Engines',tags:[]}}:
+        {id,availableForSale:!missing,price:{amount:badPrice?'0':'20',currencyCode:wrongCurrency?'CAD':'USD'},product:{title:'Piston Ring Set',productType:'Parts',tags:[]}})};
     }else{
       const lines=body.variables.input.lines.map(item=>({quantity:item.quantity,merchandise:{id:item.merchandiseId,availableForSale:true}}));
       data={cartCreate:{cart:{id:'gid://shopify/Cart/cart',checkoutUrl:'https://example.myshopify.com/checkouts/test',
-        buyerIdentity:{countryCode:'US'},cost:{totalAmount:{currencyCode:'USD'}},lines:{nodes:lines}},
+        buyerIdentity:{countryCode:'US'},cost:{totalAmount:{amount:badTotal?'0':'20.00',currencyCode:'USD'}},lines:{nodes:lines}},
         warnings,userErrors:[]}};
     }
     return {ok:true,status:200,json:async()=>({data})};
@@ -74,4 +74,20 @@ test('admin requires a configured secret',()=>{
     if(saved===undefined)delete process.env.DASHBOARD_KEY;
     else process.env.DASHBOARD_KEY=saved;
   }
+});
+
+test('zero or absent storefront prices cannot reach checkout',async()=>{
+  const res=await run([{variantId:PART,quantity:1}],{badPrice:true});
+  assert.equal(res.statusCode,409);
+  assert.match(res.body.error,/price/i);
+});
+test('non-USD storefront prices cannot reach checkout',async()=>{
+  const res=await run([{variantId:PART,quantity:1}],{wrongCurrency:true});
+  assert.equal(res.statusCode,409);
+  assert.match(res.body.error,/price/i);
+});
+test('a zero Shopify checkout total is rejected',async()=>{
+  const res=await run([{variantId:PART,quantity:1}],{badTotal:true});
+  assert.equal(res.statusCode,409);
+  assert.match(res.body.error,/total/i);
 });
