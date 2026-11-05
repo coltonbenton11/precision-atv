@@ -1,5 +1,5 @@
 const API = '';
-function money(amount,currency='USD'){try{return new Intl.NumberFormat('en-US',{style:'currency',currency}).format(Number(amount||0))}catch{return `$${amount}`}}
+function money(amount,currency='USD'){if(currency!=='USD'||amount===null||amount===undefined||String(amount).trim()==='')return 'Price temporarily unavailable';const n=Number(amount);return Number.isFinite(n)&&n>0?new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'}).format(n):'Price temporarily unavailable'}
 async function bootstrapAnalytics(){
   try{
     const r=await fetch('/api/config'); const c=await r.json();
@@ -29,6 +29,7 @@ window.PATVCart={
     }catch{return false}
   },
   add(item){
+    if(item.price===null||item.price===undefined||!Number.isFinite(Number(item.price))||Number(item.price)<=0||item.currency!=='USD')return false;
     const items=this.list();
     const key=x=>x.variantId+'|'+(x.vin||'');
     const idx=items.findIndex(x=>key(x)===key(item));
