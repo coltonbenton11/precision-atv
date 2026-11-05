@@ -1,12 +1,12 @@
+import {money} from './_pricing.js';
 const API_VERSION='2026-07';
 const BASE='https://precisionatvfab.com';
 function esc(v=''){return String(v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function strip(v=''){return String(v).replace(/<[^>]*>/g,' ').replace(/\s+/g,' ').trim()}
-function money(v,c='USD'){try{return new Intl.NumberFormat('en-US',{style:'currency',currency:c}).format(Number(v||0))}catch{return '$'+v}}
 export default async function handler(req,res){
  const handle=String(req.query.handle||'').trim();const raw=process.env.SHOPIFY_STORE_DOMAIN||'';const domain=raw.replace(/^https?:\/\//,'').replace(/\/$/,'');const token=process.env.SHOPIFY_STOREFRONT_TOKEN||process.env.SHOPIFY_STOREFRONT_ACCESS_TOKEN||process.env.SHOPIFY_STOREFRONT_PUBLIC_ACCESS_TOKEN;
  if(!handle||!domain||!token){res.status(404).send('Collection not found.');return}
- const query=`query Collection($handle:String!){collection(handle:$handle){handle title descriptionHtml seo{title description} image{url altText} products(first:48){nodes{id handle title productType vendor featuredImage{url altText} images(first:1){nodes{url altText}} variants(first:10){nodes{id availableForSale price{amount currencyCode}}}}}}}`;
+ const query=`query Collection($handle:String!) @inContext(country: US){collection(handle:$handle){handle title descriptionHtml seo{title description} image{url altText} products(first:48){nodes{id handle title productType vendor featuredImage{url altText} images(first:1){nodes{url altText}} variants(first:10){nodes{id availableForSale price{amount currencyCode}}}}}}}`;
  try{
   const r=await fetch(`https://${domain}/api/${API_VERSION}/graphql.json`,{method:'POST',headers:{'content-type':'application/json','X-Shopify-Storefront-Access-Token':token},body:JSON.stringify({query,variables:{handle}})});const j=await r.json();const c=j.data?.collection;if(!c){res.status(404).send('Collection not found.');return}
   const canonical=BASE+'/collections/'+c.handle;const title=c.seo?.title||c.title+' | Precision ATV';const desc=c.seo?.description||strip(c.descriptionHtml).slice(0,155)||('Shop '+c.title+' from Precision ATV.');
