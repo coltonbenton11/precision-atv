@@ -1,3 +1,4 @@
+import {validUsdPrice,safeUsdAmount,money} from './_pricing.js';
 import { namuraFitment } from './_namuraFitment.js';
 const API_VERSION='2026-07';
 const BASE='https://precisionatvfab.com';
@@ -5,7 +6,6 @@ const BASE='https://precisionatvfab.com';
 function esc(value=''){return String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function strip(html=''){return String(html).replace(/<[^>]*>/g,' ').replace(/\s+/g,' ').trim()}
 function safeJson(value){return JSON.stringify(value).replace(/</g,'\\u003c').replace(/>/g,'\\u003e').replace(/&/g,'\\u0026')}
-function money(amount,currency='USD'){try{return new Intl.NumberFormat('en-US',{style:'currency',currency}).format(Number(amount||0))}catch{return '$'+amount}}
 function shell(title,body,head=''){return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(title)}</title>${head}<link rel="stylesheet" href="/styles.css"><script src="/site.js"></script><script defer src="/_vercel/insights/script.js"></script></head><body>${body}</body></html>`}
 
 export default async function handler(req,res){
@@ -18,7 +18,7 @@ export default async function handler(req,res){
   if(!handle)return res.status(400).send('Missing product handle.');
   if(!domain||!token)return res.status(503).send('Shopify is not configured.');
 
-  const query=`query ProductByHandle($handle:String!){product(handle:$handle){id handle title descriptionHtml productType vendor tags seo{title description} featuredImage{url altText} images(first:8){nodes{url altText}} variants(first:100){nodes{id title availableForSale selectedOptions{name value} price{amount currencyCode} compareAtPrice{amount currencyCode}}}}}`;
+  const query=`query ProductByHandle($handle:String!) @inContext(country: US){product(handle:$handle){id handle title descriptionHtml productType vendor tags seo{title description} featuredImage{url altText} images(first:8){nodes{url altText}} variants(first:100){nodes{id title availableForSale selectedOptions{name value} price{amount currencyCode} compareAtPrice{amount currencyCode}}}}}`;
   try{
     const r=await fetch(`https://${domain}/api/${API_VERSION}/graphql.json`,{method:'POST',headers:{'content-type':'application/json','X-Shopify-Storefront-Access-Token':token},body:JSON.stringify({query,variables:{handle}})});
     const j=await r.json();
@@ -32,7 +32,9 @@ export default async function handler(req,res){
     const requiresVin=!(p.tags||[]).some(t=>String(t).toLowerCase()==='vin-not-required') && ((p.tags||[]).some(t=>['vin-required','requires-vin'].includes(String(t).toLowerCase())) || (/\b(remanufactured|remanufactored|rebuilt\s+engine|long[ -]?block|complete\s+engine|ecu\s+(reflash|tuning?)|bench\s+(ecu\s+)?reflash)\b/i.test(p.title)||/^(remanufactured\s+)?engines?$/i.test(p.productType||'')));
     const variants=p.variants?.nodes||[];
     const fitment=namuraFitment(p.title);
-    const selected=variants.find(v=>v.availableForSale)||variants[0];
+    const selected=variants.find(v=>v.availableForSale&&validUsdPrice(v.price))||variants.find(v=>v.availableForSale)||variants[0];
+    const selectedPriceValid=validUsdPrice(selected?.price);
+    const selectedAvailable=Boolean(selected?.availableForSale&&selectedPriceValid);
     const images=(p.images?.nodes?.length?p.images.nodes:(p.featuredImage?[p.featuredImage]:[]));
     const canonical=`${BASE}/products/${encodeURIComponent(p.handle)}`;
     const metaTitle=p.seo?.title||(fitment?`${fitment.part} ${fitment.spec} | Precision ATV`:`${p.title} | Precision ATV`);
@@ -44,9 +46,9 @@ export default async function handler(req,res){
       name:p.title,description:strip(p.descriptionHtml),image:images.map(i=>i.url),brand:{'@type':'Brand',name:p.vendor||'Precision ATV'},
       sku:fitment?.part||selected?.id||p.id,
       ...(fitment?{mpn:fitment.part,additionalProperty:[{'@type':'PropertyValue',name:'Compatible applications',value:fitment.models}]}:{}),
-      offers:variants.map(v=>({'@type':'Offer',url:canonical,priceCurrency:v.price?.currencyCode||'USD',price:v.price?.amount||0,availability:v.availableForSale?'https://schema.org/InStock':'https://schema.org/OutOfStock'}))
+      offers:variants.filter(v=>validUsdPrice(v.price)).map(v=>({'@type':'Offer',url:canonical,priceCurrency:v.price?.currencyCode||'USD',price:v.price.amount,availability:v.availableForSale?'https://schema.org/InStock':'https://schema.org/OutOfStock'}))
     };
-    const variantOptions=variants.map(v=>`<option value="${esc(v.id)}" data-price="${esc(v.price?.amount||0)}" data-currency="${esc(v.price?.currencyCode||'USD')}" data-available="${v.availableForSale?'1':'0'}" ${v.id===selected?.id?'selected':''}>${esc(v.title==='Default Title'?'Standard':v.title)} — ${esc(money(v.price?.amount,v.price?.currencyCode))}${v.availableForSale?'':' — Sold out'}</option>`).join('');
+    const variantOptions=variants.map(v=>`<option value="${esc(v.id)}" data-price="${esc(safeUsdAmount(v.price)||'')}" data-currency="${esc(v.price?.currencyCode||'USD')}" data-available="${v.availableForSale?'1':'0'}" ${v.id===selected?.id?'selected':''}>${esc(v.title==='Default Title'?'Standard':v.title)} — ${esc(money(v.price?.amount,v.price?.currencyCode))}${v.availableForSale?'':' — Sold out'}</option>`).join('');
     const thumbs=images.map((img,i)=>`<button class="thumb ${i===0?'active':''}" type="button" onclick="swapImage(this,'${esc(img.url)}')"><img src="${esc(img.url)}" alt="${esc(img.altText||p.title)}"></button>`).join('');
     const compare=selected?.compareAtPrice&&Number(selected.compareAtPrice.amount)>Number(selected.price?.amount)?`<span class="compare-price">${esc(money(selected.compareAtPrice.amount,selected.compareAtPrice.currencyCode))}</span>`:'';
 
@@ -66,7 +68,7 @@ export default async function handler(req,res){
     <div class="kicker">${esc(p.productType||'Powersports')} • ${esc(p.vendor||'Precision ATV')}</div>
     <h1>${esc(p.title)}</h1>
     <div class="detail-price"><span id="price">${esc(money(selected?.price?.amount,currency))}</span> ${compare}</div>
-    <div id="availability" class="availability ${selected?.availableForSale?'in':'out'}">${selected?.availableForSale?'In stock / available to order':'Currently unavailable'}</div>
+    <div id="availability" class="availability ${selectedAvailable?'in':'out'}">${!selectedPriceValid?'Price temporarily unavailable — call the shop':selectedAvailable?'In stock / available to order':'Currently unavailable'}</div>
     ${variants.length>1?`<label class="field-label" for="variant">Choose option</label><select class="select" id="variant">${variantOptions}</select>`:''}
     <div class="vin-field" ${requiresVin?'':'hidden'}>
       <label class="field-label" for="vin">Vehicle VIN <span class="required-mark">*</span></label>
@@ -90,8 +92,9 @@ ${fitmentHtml}
 <script>
 const requiresVin=${safeJson(requiresVin)};
 const productDetails=${safeJson({title:p.title,handle:p.handle,image:mainImage})};
-const variants=${safeJson(variants.map(v=>({id:v.id,title:v.title,available:v.availableForSale,price:v.price?.amount||0,currency:v.price?.currencyCode||'USD'})))};
+const variants=${safeJson(variants.map(v=>({id:v.id,title:v.title,available:v.availableForSale,price:safeUsdAmount(v.price),currency:v.price?.currencyCode||'USD'})))};
 function swapImage(btn,url){document.getElementById('mainImage').src=url;document.querySelectorAll('.thumb').forEach(x=>x.classList.remove('active'));btn.classList.add('active')}
+function variantPriced(v){return !!v&&v.currency==='USD'&&v.price!==null&&v.price!==undefined&&Number.isFinite(Number(v.price))&&Number(v.price)>0}
 function currentVariant(){const s=document.getElementById('variant');const id=s?s.value:${safeJson(selected?.id||'')};return variants.find(v=>v.id===id)||variants[0]}
 function normalizeVin(value){return String(value||'').toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,17)}
 function validVin(value){return /^[A-HJ-NPR-Z0-9]{17}$/.test(normalizeVin(value))}
@@ -100,19 +103,19 @@ function updateBuyState(){
   const vin=document.getElementById('vin');
   const valid=!requiresVin||validVin(vin?.value);
   const btn=document.getElementById('buyBtn');
-  if(btn)btn.disabled=!(v&&v.available&&valid);
-  const addBtn=document.getElementById('addBtn');if(addBtn)addBtn.disabled=!(v&&v.available&&valid);
+  if(btn)btn.disabled=!(v&&v.available&&variantPriced(v)&&valid);
+  const addBtn=document.getElementById('addBtn');if(addBtn)addBtn.disabled=!(v&&v.available&&variantPriced(v)&&valid);
   if(vin)vin.classList.toggle('invalid',requiresVin&&vin.value.length>0&&!valid);
   const err=document.getElementById('vinError');
   if(err)err.hidden=!(requiresVin&&vin?.value.length>0&&!valid);
 }
-function updateVariant(){const v=currentVariant();if(!v)return;document.getElementById('price').textContent=money(v.price,v.currency);const a=document.getElementById('availability');a.textContent=v.available?'In stock / available to order':'Currently unavailable';a.className='availability '+(v.available?'in':'out');updateBuyState()}
+function updateVariant(){const v=currentVariant();if(!v)return;document.getElementById('price').textContent=money(v.price,v.currency);const a=document.getElementById('availability');a.textContent=!variantPriced(v)?'Price temporarily unavailable — call the shop':v.available?'In stock / available to order':'Currently unavailable';a.className='availability '+(v.available&&variantPriced(v)?'in':'out');updateBuyState()}
 document.getElementById('variant')?.addEventListener('change',updateVariant);
 const vinInput=document.getElementById('vin');
 vinInput?.addEventListener('input',()=>{const normalized=normalizeVin(vinInput.value);if(vinInput.value!==normalized)vinInput.value=normalized;updateBuyState()});
 updateBuyState();
 async function buyNow(){
-  const v=currentVariant();if(!v||!v.available)return;
+  const v=currentVariant();if(!v||!v.available||!variantPriced(v))return;
   const vin=normalizeVin(document.getElementById('vin')?.value);
   if(requiresVin&&!validVin(vin)){
     const input=document.getElementById('vin');const err=document.getElementById('vinError');
@@ -131,7 +134,7 @@ async function buyNow(){
   }catch(e){alert(e.message);btn.textContent='Buy now';updateBuyState()}
 }
 function addToCart(){
-  const v=currentVariant();if(!v||!v.available)return;
+  const v=currentVariant();if(!v||!v.available||!variantPriced(v))return;
   const vin=normalizeVin(document.getElementById('vin')?.value);
   if(requiresVin&&!validVin(vin)){document.getElementById('vin')?.focus();updateBuyState();return}
   const qty=Math.min(100,Math.max(1,Number(document.getElementById('qty').value)||1));
@@ -141,9 +144,9 @@ function addToCart(){
   if(msg)msg.innerHTML=ok?'Added to cart. <a href="/cart"><u>View your cart</u></a>.':'Could not save your cart. Try Buy now instead.';
   if(ok)track('add_to_cart',{currency:v.currency,value:Number(v.price)*qty,items:[{item_id:v.id,item_name:productDetails.title,price:Number(v.price),quantity:qty}]});
 }
-track('view_item',{currency:${safeJson(currency)},value:Number(${safeJson(selected?.price?.amount||0)}),items:[{item_id:${safeJson(selected?.id||p.id)},item_name:${safeJson(p.title)}}]});
+track('view_item',{currency:${safeJson(currency)},value:Number(${safeJson(selectedPriceValid?selected.price.amount:null)}),items:[{item_id:${safeJson(selected?.id||p.id)},item_name:${safeJson(p.title)}}]});
 </script>`;
-    res.setHeader('Cache-Control','public, s-maxage=120, stale-while-revalidate=600');
+    res.setHeader('Cache-Control','public, s-maxage=30, stale-while-revalidate=60');
     res.setHeader('Content-Type','text/html; charset=utf-8');
     return res.status(200).send(shell(metaTitle,body,head));
   }catch(e){
