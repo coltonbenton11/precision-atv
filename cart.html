@@ -9,6 +9,8 @@ const listEl=document.getElementById('cartItems'),noticeEl=document.getElementBy
 const escapeHtml=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function renderCart(){
   const list=window.PATVCart.list();
+  const pricesValid=list.every(item=>item.price!==null&&item.price!==undefined&&Number.isFinite(Number(item.price))&&Number(item.price)>0&&item.currency==='USD');
+  document.getElementById('checkoutBtn').disabled=!pricesValid;
   document.getElementById('emptyCart').hidden=!!list.length;
   document.getElementById('cartSummary').hidden=!list.length;
   listEl.innerHTML=list.map((item,i)=>`<div class="cart-line">
@@ -17,7 +19,7 @@ function renderCart(){
     <div class="cart-controls"><label>Qty <input data-quantity="${i}" type="number" min="1" max="100" value="${Number(item.quantity)||1}"></label><button class="btn ghost" type="button" data-remove="${i}">Remove</button></div>
   </div>`).join('');
   const total=list.reduce((sum,item)=>sum+Number(item.price||0)*Number(item.quantity||0),0);
-  document.getElementById('cartEstimate').textContent='Estimated subtotal: '+new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'}).format(total);
+  document.getElementById('cartEstimate').textContent=pricesValid?'Estimated subtotal: '+new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'}).format(total):'Price temporarily unavailable — remove and re-add affected items.';
 }
 listEl.addEventListener('click',e=>{
   const remove=e.target.closest('[data-remove]');if(!remove)return;
@@ -33,6 +35,7 @@ listEl.addEventListener('change',e=>{
 document.getElementById('checkoutBtn').addEventListener('click',async()=>{
   const items=window.PATVCart.list();
   if(!items.length)return;
+  if(items.some(item=>item.price===null||item.price===undefined||!Number.isFinite(Number(item.price))||Number(item.price)<=0||item.currency!=='USD')){noticeEl.textContent='An item has an invalid price. Remove and re-add it before checkout.';noticeEl.hidden=false;return}
   const btn=document.getElementById('checkoutBtn');btn.disabled=true;btn.textContent='Starting secure checkout…';
   noticeEl.hidden=true;
   try{

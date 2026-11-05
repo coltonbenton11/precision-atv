@@ -1,3 +1,4 @@
+import {validUsdPrice} from './_pricing.js';
 const API_VERSION = '2026-07';
 const MAX_LINES = 20;
 function config() {
@@ -56,12 +57,13 @@ export default async function handler(req,res) {
     // Always resolve product types on the server; browser prices and VIN flags cannot be trusted.
     const ids = [...new Set(items.map(item=>item.variantId))];
     const lookup = await graphql(domain,token,
-      'query CartVariants($ids:[ID!]!){nodes(ids:$ids){... on ProductVariant{id availableForSale product{title productType tags}}}}',
+      'query CartVariants($ids:[ID!]!) @inContext(country: US){nodes(ids:$ids){... on ProductVariant{id availableForSale price{amount currencyCode} product{title productType tags}}}}',
       {ids});
     const variants = new Map((lookup.nodes || []).filter(Boolean).map(variant=>[variant.id,variant]));
     for (const item of items) {
       const variant=variants.get(item.variantId);
       if (!variant || !variant.availableForSale) return res.status(409).json({error:'An item is no longer available. Please refresh the product page.'});
+       if (!validUsdPrice(variant.price)) return res.status(409).json({error:'A product price is unavailable or invalid. Please refresh the page or contact the shop.'});
       if (vinRequired(variant.product) && !/^[A-HJ-NPR-Z0-9]{17}$/.test(item.vin)) {
         return res.status(400).json({error:`A valid 17-character VIN is required for ${variant.product.title}.`});
       }
@@ -75,7 +77,7 @@ export default async function handler(req,res) {
     }));
     const data=await graphql(domain,token,
       `mutation CreateCart($input:CartInput!){cartCreate(input:$input){
-        cart{id checkoutUrl buyerIdentity{countryCode} cost{totalAmount{currencyCode}}
+        cart{id checkoutUrl buyerIdentity{countryCode} cost{totalAmount{amount currencyCode}}
           lines(first:100){nodes{quantity merchandise{... on ProductVariant{id availableForSale}}}}}
         userErrors{code field message} warnings{code message target}
       }}`,
@@ -100,6 +102,8 @@ export default async function handler(req,res) {
       return res.status(409).json({error:'Shopify could not add every selected item. Review your cart or contact the shop.'});
     }
     if(cart.cost?.totalAmount?.currencyCode!=='USD')return res.status(409).json({error:'Unexpected checkout currency. Contact the shop.'});
+    const total=Number(cart.cost?.totalAmount?.amount);
+    if(!Number.isFinite(total)||total<=0)return res.status(409).json({error:'Checkout total could not be verified. Contact the shop.'});
     return res.status(200).json({checkoutUrl:cart.checkoutUrl});
   } catch(error) {
     console.error('Shopify checkout failure',error);
