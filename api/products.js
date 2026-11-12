@@ -77,7 +77,7 @@ export default async function handler(req,res){
     return res.status(503).json({mode:'unavailable',error:'Shopify catalog is temporarily unavailable.',products:[],total:0,hasMore:false});
   }
 
-  const query=`query Products($first:Int!,$after:String) @inContext(country: US){products(first:$first,after:$after,sortKey:BEST_SELLING){pageInfo{hasNextPage endCursor}nodes{id handle title productType vendor tags featuredImage{url altText} images(first:1){nodes{url altText}} media(first:1){nodes{previewImage{url altText}}} variants(first:10){nodes{id title availableForSale price{amount currencyCode}}}}}}`;
+  const query=`query Products($first:Int!,$after:String) @inContext(country: US){products(first:$first,after:$after,sortKey:BEST_SELLING){pageInfo{hasNextPage endCursor}nodes{id handle title productType vendor tags collections(first:50){nodes{title handle}} featuredImage{url altText} images(first:1){nodes{url altText}} media(first:1){nodes{previewImage{url altText}}} variants(first:10){nodes{id title availableForSale price{amount currencyCode}}}}}}`;
 
   try{
     const products=[];
@@ -101,12 +101,13 @@ export default async function handler(req,res){
         const v=p.variants?.nodes?.find(x=>x.availableForSale)||p.variants?.nodes?.[0];
         const image=p.featuredImage?.url||p.images?.nodes?.[0]?.url||p.media?.nodes?.[0]?.previewImage?.url||fallbackImage(p.title);
         const tags=Array.isArray(p.tags)?p.tags:[];
+        const collections=p.collections?.nodes?.map(c=>({title:c.title,handle:c.handle}))||[];
         const namura=namuraFitment(p.title);
         products.push({
-          id:p.id,handle:p.handle,title:p.title,productType:p.productType,vendor:p.vendor,tags,image,
+          id:p.id,handle:p.handle,title:p.title,productType:p.productType,vendor:p.vendor,tags,collections,image,
           variantId:v?.id||null,price:safeUsdAmount(v?.price),currency:v?.price?.currencyCode||'USD',
           available:!!v?.availableForSale&&validUsdPrice(v?.price),
-          searchText:[p.title,p.productType,p.vendor,...tags,namura?.part,namura?.models,namura?.spec].filter(Boolean).join(' ').toLowerCase()
+          searchText:[p.title,p.productType,p.vendor,...tags,...collections.map(c=>c.title),namura?.part,namura?.models,namura?.spec].filter(Boolean).join(' ').toLowerCase()
         });
       }
 
