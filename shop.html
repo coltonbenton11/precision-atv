@@ -127,7 +127,20 @@ function clearEngineFinder(){
 document.querySelectorAll('.chip').forEach(b=>b.onclick=()=>setFilter(b.dataset.filter));
 const selectedFilter=new URLSearchParams(location.search).get('filter');
 if(['all','engine','part'].includes(selectedFilter))setFilter(selectedFilter);
-document.getElementById('search').oninput=()=>{visibleCount=60;render()};
+document.getElementById('search').oninput=()=>{
+  visibleCount=60;
+  // Searching a model or collection must include engines AND parts, even when
+  // the default catalog view is set to "Engines".
+  if(clean(document.getElementById('search').value)&&filter!=='all'){
+    filter='all';
+    document.querySelectorAll('.chip').forEach(x=>{
+      const active=x.dataset.filter==='all';
+      x.classList.toggle('active',active);
+      x.setAttribute('aria-pressed',String(active));
+    });
+  }
+  render();
+};
 document.getElementById('findEngine').onclick=runEngineFinder;
 document.getElementById('clearEngine').onclick=clearEngineFinder;
 document.getElementById('engineYear').addEventListener('keydown',e=>{if(e.key==='Enter')runEngineFinder()});
