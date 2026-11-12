@@ -3,11 +3,11 @@
 <header class="page-hero"><div class="wrap"><div class="kicker">Shop Precision ATV</div><h1>THE RIGHT PARTS.<br>FOR YOUR NEXT RIDE.</h1><p class="muted">Shop remanufactured engines, rebuild kits, parts and ECU tuning backed by real engine-building experience in Conroe, Texas.</p></div></header>
 <section><div class="wrap">
 <div class="engine-finder">
-  <div class="engine-finder-copy"><div class="kicker">Engine Finder</div><h2>Find engines, rebuild kits &amp; parts for your machine.</h2><p>Search by brand, year, model, or engine size. Check exact fitment before ordering.</p></div>
+  <div class="engine-finder-copy"><div class="kicker">Shop by Machine</div><h2>Find engines, rebuild kits &amp; parts for your machine.</h2><p>Select a brand, then a model to see every product in its Shopify collections. Optionally narrow results by year; confirm exact fitment before ordering.</p></div>
   <div class="engine-finder-fields">
-    <label><span>Brand</span><select id="engineBrand" class="select"><option value="">Any brand</option><option>Polaris</option><option>Can-Am</option><option>Honda</option><option>Yamaha</option><option>Kawasaki</option><option>Suzuki</option><option>Arctic Cat</option></select></label>
-    <label><span>Year</span><input id="engineYear" class="search" inputmode="numeric" maxlength="4" placeholder="2021"></label>
-    <label class="engine-model"><span>Model / engine</span><input id="engineModel" class="search" placeholder="RZR XP 1000, Defender HD10…"></label>
+    <label><span>1. Brand</span><select id="engineBrand" class="select" aria-label="Vehicle brand" disabled><option value="">Loading brands…</option></select></label>
+    <label class="engine-model"><span>2. Model</span><select id="engineModel" class="select" aria-label="Vehicle model" disabled><option value="">Select a brand first</option></select></label>
+    <label><span>3. Year (optional)</span><input id="engineYear" class="search" inputmode="numeric" maxlength="4" placeholder="e.g. 2021"></label>
     <div class="engine-finder-actions"><button id="findEngine" class="btn" type="button">Find products</button><button id="clearEngine" class="btn ghost" type="button">Clear</button></div>
   </div>
 </div>
@@ -42,6 +42,78 @@ function brandMatch(p,brand){
   if(b==='arctic cat')return s.includes('arctic cat');
   return s.includes(b)
 }
+// Build model choices from actual Shopify collection memberships, not tags or guesses.
+const BRAND_ORDER=['Polaris','Can-Am','Kawasaki','Yamaha','Honda','Suzuki','Arctic Cat'];
+let modelGroups=new Map();
+
+function modelFromCollection(c){
+  let name=String(c?.title||'').trim().replace(/\s+/g,' ');
+  if(!name)return null;
+  let brand='';
+  if(/^can[\s-]*am\b/i.test(name)){brand='Can-Am';name=name.replace(/^can[\s-]*am\s*/i,'')}
+  else if(/^polaris\b/i.test(name)){brand='Polaris';name=name.replace(/^polaris\s*/i,'')}
+  // A model-specific collection also works when its title omits the make.
+  if(/^(?:defender|maverick|outlander|renegade|commander|x3)\b/i.test(name))brand='Can-Am';
+  else if(/^(?:rzr|ranger|sportsman|scrambler|general|ace|xpedition)\b/i.test(name))brand='Polaris';
+  else if(/^(?:krx|teryx|brute force|mule)\b/i.test(name))brand='Kawasaki';
+  else if(/^(?:yxz|wolverine|viking|rhino|grizzly|raptor|kodiak)\b/i.test(name))brand='Yamaha';
+  else if(/^(?:talon|pioneer|rancher|foreman|rubicon|rincon)\b/i.test(name))brand='Honda';
+  else if(/^(?:king quad|kingquad|quad racer|lt-z)\b/i.test(name))brand='Suzuki';
+  else if(/^(?:wildcat|prowler|alterra)\b/i.test(name))brand='Arctic Cat';
+  else return null; // Exclude generic merchandising and parts collections.
+  name=name.replace(/\s+engines?(?:\s*&\s*rebuild kits)?$/i,'').trim();
+  if(/^x3$/i.test(name))name='Maverick X3';
+  name=name.replace(/\b(?:rzr|xp|hd\d+|sohc|x3|rs1|krx)\b/gi,word=>word.toUpperCase());
+  const key=clean(brand+'|'+name).replace(/\s+/g,' ');
+  return {brand,key,label:name};
+}
+
+function populateModels(){
+  const brand=document.getElementById('engineBrand').value;
+  const selector=document.getElementById('engineModel');
+  const previous=selector.value;
+  selector.replaceChildren();
+  const empty=document.createElement('option');
+  empty.value='';
+  empty.textContent=brand?'All '+brand+' models':'Select a brand first';
+  selector.appendChild(empty);
+  const choices=[...modelGroups.values()].filter(g=>g.brand===brand)
+    .sort((a,b)=>a.label.localeCompare(b.label,undefined,{numeric:true}));
+  choices.forEach(group=>{
+    const option=document.createElement('option');
+    option.value=group.key;
+    option.textContent=group.label;
+    selector.appendChild(option);
+  });
+  selector.disabled=!brand||choices.length===0;
+  if(choices.some(g=>g.key===previous))selector.value=previous;
+}
+function populateFinder(){
+  modelGroups=new Map();
+  const brands=new Set();
+  for(const p of products){
+    for(const collection of (p.collections||[])){
+      const model=modelFromCollection(collection);
+      if(!model)continue;
+      brands.add(model.brand);
+      if(!modelGroups.has(model.key))modelGroups.set(model.key,model);
+    }
+    for(const brand of BRAND_ORDER)if(brandMatch(p,brand))brands.add(brand);
+  }
+  const brandSelect=document.getElementById('engineBrand');
+  brandSelect.replaceChildren();
+  const empty=document.createElement('option');
+  empty.value='';empty.textContent='Select brand';
+  brandSelect.appendChild(empty);
+  BRAND_ORDER.filter(b=>brands.has(b)).forEach(brand=>{
+    const option=document.createElement('option');
+    option.value=brand;option.textContent=brand;
+    brandSelect.appendChild(option);
+  });
+  brandSelect.disabled=brandSelect.options.length===1;
+  populateModels();
+}
+
 function yearMatch(p,year){
   const y=Number(year);
   if(!year)return true;
@@ -59,9 +131,10 @@ function engineFinderMatch(p){
   if(!engineFinderActive)return true;
   const brand=document.getElementById('engineBrand').value;
   const year=clean(document.getElementById('engineYear').value);
-  const model=clean(document.getElementById('engineModel').value);
-  const s=productText(p);
-  return brandMatch(p,brand)&&yearMatch(p,year)&&(!model||model.split(/\s+/).every(term=>s.includes(term)))
+  const model=document.getElementById('engineModel').value;
+  // Exact Shopify collection membership prevents unrelated name/tag matches.
+  if(model)return yearMatch(p,year)&&(p.collections||[]).some(c=>modelFromCollection(c)?.key===model);
+  return brandMatch(p,brand)&&yearMatch(p,year)
 }
 function currentList(){
   const q=clean(document.getElementById('search').value);
@@ -96,6 +169,8 @@ function runEngineFinder(){
   const year=clean(document.getElementById('engineYear').value);
   const model=clean(document.getElementById('engineModel').value);
   engineFinderActive=Boolean(brand||year||model);
+  // Avoid letting a previous free-text search hide collection results.
+  document.getElementById('search').value='';
   filter='all';visibleCount=60;
   document.querySelectorAll('.chip').forEach(x=>{const active=x.dataset.filter==='all';x.classList.toggle('active',active);x.setAttribute('aria-pressed',String(active))});
   render();
@@ -105,6 +180,8 @@ function clearEngineFinder(){
   document.getElementById('engineBrand').value='';
   document.getElementById('engineYear').value='';
   document.getElementById('engineModel').value='';
+  populateModels();
+  document.getElementById('search').value='';
   engineFinderActive=false;filter='engine';visibleCount=60;
   document.querySelectorAll('.chip').forEach(x=>{const active=x.dataset.filter==='engine';x.classList.toggle('active',active);x.setAttribute('aria-pressed',String(active))});
   render()
@@ -114,6 +191,7 @@ function clearEngineFinder(){
     const r=await fetch('/api/products?all=1');
     const d=await r.json();
     products=d.products||[];
+    populateFinder();
     if(d.mode!=='shopify'){
       const n=document.getElementById('shopNotice');n.hidden=false;
       n.textContent='Some live catalog data is temporarily unavailable. Call the shop if you need immediate fitment or ordering help.'
@@ -143,7 +221,12 @@ document.getElementById('search').oninput=()=>{
 };
 document.getElementById('findEngine').onclick=runEngineFinder;
 document.getElementById('clearEngine').onclick=clearEngineFinder;
+document.getElementById('engineBrand').onchange=()=>{
+  document.getElementById('engineModel').value='';
+  populateModels();
+  if(engineFinderActive)runEngineFinder();
+};
 document.getElementById('engineYear').addEventListener('keydown',e=>{if(e.key==='Enter')runEngineFinder()});
-document.getElementById('engineModel').addEventListener('keydown',e=>{if(e.key==='Enter')runEngineFinder()});
+document.getElementById('engineModel').onchange=runEngineFinder;
 showMore.onclick=()=>{visibleCount+=60;render()};
 </script></body></html>
