@@ -68,3 +68,26 @@ test('product detail does not advertise $0 or enable invalid-price purchases',as
     assert.match(res.html,/id="buyBtn"[^>]* disabled/);
   });
 });
+
+// Regression: a price shown on the collection must remain visible on the product page.
+test('product detail displays Shopify price on first render and initializes variant pricing',async()=>{
+  await withShopify(async(_url,init)=>{
+    assert.match(JSON.parse(init.body).query,/@inContext\\(country: US\\)/);
+    return {ok:true,json:async()=>({data:{product:{
+      id:'gid://shopify/Product/10343352238326',
+      handle:'hot-rods-bottom-end-kit-hr00214',
+      title:'2016 ONLY POLARIS XP TURBO HOT RODS - BOTTOM END KIT - HR00214',
+      productType:'Engine',vendor:'HOT RODS',tags:[],descriptionHtml:'<p>Bottom end kit</p>',
+      seo:null,featuredImage:null,images:{nodes:[]},
+      variants:{nodes:[{id:'gid://shopify/ProductVariant/51823872344310',title:'Default Title',
+        availableForSale:true,selectedOptions:[],price:{amount:'1630.60',currencyCode:'USD'},compareAtPrice:null}]}
+    }}})};
+  },async()=>{
+    const res=response();await productPage({query:{handle:'hot-rods-bottom-end-kit-hr00214'}},res);
+    assert.equal(res.statusCode,200);
+    assert.match(res.html,/<span id="price">\\$1,630\\.60<\\/span>/);
+    assert.doesNotMatch(res.html,/<span id="price">\\$0\\.00<\\/span>/);
+    assert.match(res.html,/updateVariant\\(\\);/);
+    assert.equal(res.headers['Cache-Control'],'no-store, max-age=0, must-revalidate');
+  });
+});

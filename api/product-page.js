@@ -32,7 +32,7 @@ export default async function handler(req,res){
     const requiresVin=!(p.tags||[]).some(t=>String(t).toLowerCase()==='vin-not-required') && ((p.tags||[]).some(t=>['vin-required','requires-vin'].includes(String(t).toLowerCase())) || (/\b(remanufactured|remanufactored|rebuilt\s+engine|long[ -]?block|complete\s+engine|ecu\s+(reflash|tuning?)|bench\s+(ecu\s+)?reflash)\b/i.test(p.title)||/^(remanufactured\s+)?engines?$/i.test(p.productType||'')));
     const variants=p.variants?.nodes||[];
     const fitment=namuraFitment(p.title);
-    const selected=variants.find(v=>v.availableForSale&&validUsdPrice(v.price))||variants.find(v=>v.availableForSale)||variants[0];
+    const selected=variants.find(v=>v.availableForSale&&validUsdPrice(v.price))||variants.find(v=>validUsdPrice(v.price))||variants.find(v=>v.availableForSale)||variants[0];
     const selectedPriceValid=validUsdPrice(selected?.price);
     const selectedAvailable=Boolean(selected?.availableForSale&&selectedPriceValid);
     const images=(p.images?.nodes?.length?p.images.nodes:(p.featuredImage?[p.featuredImage]:[]));
@@ -41,6 +41,7 @@ export default async function handler(req,res){
     const metaDescription=p.seo?.description||(fitment?`Namura ${fitment.part}: ${fitment.models}`.slice(0,155):strip(p.descriptionHtml).slice(0,155))||`Shop ${p.title} from Precision ATV in Conroe, Texas.`;
     const mainImage=images[0]?.url||'';
     const currency=selected?.price?.currencyCode||'USD';
+    const initialPrice=selectedPriceValid?money(selected.price.amount,currency):'Price temporarily unavailable';
     const schema={
       '@context':'https://schema.org','@type':'Product',
       name:p.title,description:strip(p.descriptionHtml),image:images.map(i=>i.url),brand:{'@type':'Brand',name:p.vendor||'Precision ATV'},
@@ -67,7 +68,7 @@ export default async function handler(req,res){
   <div class="product-summary">
     <div class="kicker">${esc(p.productType||'Powersports')} • ${esc(p.vendor||'Precision ATV')}</div>
     <h1>${esc(p.title)}</h1>
-    <div class="detail-price"><span id="price">${esc(money(selected?.price?.amount,currency))}</span> ${compare}</div>
+    <div class="detail-price"><span id="price">${esc(initialPrice)}</span> ${compare}</div>
     <div id="availability" class="availability ${selectedAvailable?'in':'out'}">${!selectedPriceValid?'Price temporarily unavailable — call the shop':selectedAvailable?'In stock / available to order':'Currently unavailable'}</div>
     ${variants.length>1?`<label class="field-label" for="variant">Choose option</label><select class="select" id="variant">${variantOptions}</select>`:''}
     <div class="vin-field" ${requiresVin?'':'hidden'}>
@@ -109,11 +110,12 @@ function updateBuyState(){
   const err=document.getElementById('vinError');
   if(err)err.hidden=!(requiresVin&&vin?.value.length>0&&!valid);
 }
-function updateVariant(){const v=currentVariant();if(!v)return;document.getElementById('price').textContent=money(v.price,v.currency);const a=document.getElementById('availability');a.textContent=!variantPriced(v)?'Price temporarily unavailable — call the shop':v.available?'In stock / available to order':'Currently unavailable';a.className='availability '+(v.available&&variantPriced(v)?'in':'out');updateBuyState()}
+function updateVariant(){const v=currentVariant();if(!v)return;document.getElementById('price').textContent=variantPriced(v)?money(v.price,v.currency):'Price temporarily unavailable';const a=document.getElementById('availability');a.textContent=!variantPriced(v)?'Price temporarily unavailable — call the shop':v.available?'In stock / available to order':'Currently unavailable';a.className='availability '+(v.available&&variantPriced(v)?'in':'out');updateBuyState()}
 document.getElementById('variant')?.addEventListener('change',updateVariant);
 const vinInput=document.getElementById('vin');
 vinInput?.addEventListener('input',()=>{const normalized=normalizeVin(vinInput.value);if(vinInput.value!==normalized)vinInput.value=normalized;updateBuyState()});
-updateBuyState();
+// Synchronize visible price with the selected Shopify variant as soon as the page loads.
+updateVariant();
 async function buyNow(){
   const v=currentVariant();if(!v||!v.available||!variantPriced(v))return;
   const vin=normalizeVin(document.getElementById('vin')?.value);
@@ -146,7 +148,8 @@ function addToCart(){
 }
 track('view_item',{currency:${safeJson(currency)},value:Number(${safeJson(selectedPriceValid?selected.price.amount:null)}),items:[{item_id:${safeJson(selected?.id||p.id)},item_name:${safeJson(p.title)}}]});
 </script>`;
-    res.setHeader('Cache-Control','public, s-maxage=30, stale-while-revalidate=60');
+    // Do not keep stale product prices in the CDN or browser cache.
+    res.setHeader('Cache-Control','no-store, max-age=0, must-revalidate');
     res.setHeader('Content-Type','text/html; charset=utf-8');
     return res.status(200).send(shell(metaTitle,body,head));
   }catch(e){
