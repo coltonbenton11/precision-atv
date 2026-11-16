@@ -72,7 +72,7 @@ test('product detail does not advertise $0 or enable invalid-price purchases',as
 // Regression: a price shown on the collection must remain visible on the product page.
 test('product detail displays Shopify price on first render and initializes variant pricing',async()=>{
   await withShopify(async(_url,init)=>{
-    assert.match(JSON.parse(init.body).query,/@inContext\\(country: US\\)/);
+    assert.match(JSON.parse(init.body).query,/@inContext\(country: US\)/);
     return {ok:true,json:async()=>({data:{product:{
       id:'gid://shopify/Product/10343352238326',
       handle:'hot-rods-bottom-end-kit-hr00214',
@@ -85,9 +85,9 @@ test('product detail displays Shopify price on first render and initializes vari
   },async()=>{
     const res=response();await productPage({query:{handle:'hot-rods-bottom-end-kit-hr00214'}},res);
     assert.equal(res.statusCode,200);
-    assert.match(res.html,/<span id="price">\\$1,630\\.60<\\/span>/);
-    assert.doesNotMatch(res.html,/<span id="price">\\$0\\.00<\\/span>/);
-    assert.match(res.html,/updateVariant\\(\\);/);
+    assert.match(res.html,/<span id="price">\$1,630\.60<\/span>/);
+    assert.doesNotMatch(res.html,/<span id="price">\$0\.00<\/span>/);
+    assert.match(res.html,/updateVariant\(\);/);
     assert.equal(res.headers['Cache-Control'],'no-store, max-age=0, must-revalidate');
   });
 });
